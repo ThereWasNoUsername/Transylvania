@@ -1,0 +1,864 @@
+<?xml version="1.0" encoding="us-ascii"?>
+
+<!DOCTYPE TranscendenceExtension
+	[
+	<!ENTITY unidHD						"0x00830000">
+	<!ENTITY unidHumanSpaceVol01		"0x00100000">
+	
+	<!ENTITY unidExtension				"0xA0130080">
+	<!ENTITY rsCover					"0xA0130081">
+	
+	<!ENTITY scEI100					"0x00003001">
+	<!ENTITY scRoninA					"0x00003002">
+	<!ENTITY scRoninB					"0x00003003">
+	<!ENTITY scRoninC					"0x00003004">
+	<!ENTITY scTenhoveSentinel			"0x00003005">
+	<!ENTITY scEI100M					"0x00003006">
+	<!ENTITY scMikeno					"0x00003007">
+	<!ENTITY scSapphireYacht			"0x00003008">
+	<!ENTITY scT31ArmedTransport		"0x00003009">
+	<!ENTITY scAutoSentinel				"0x0000300A">
+	<!ENTITY scMuleAuton				"0x0000300B">
+	<!ENTITY sc300DDefenderAuton		"0x0000300C">
+	<!ENTITY sc1MBattleAuton			"0x0000300D">
+	<!ENTITY sc1MiBattleAuton			"0x0000300E">
+	<!ENTITY sc310AAegisAuton			"0x0000300F">
+	<!ENTITY scEI500					"0x00003010">
+	<!ENTITY scWolfen					"0x00003011">
+	<!ENTITY sc200ADefenderAuton		"0x00003017">
+	<!ENTITY scExplorerAuton			"0x00003018">
+	
+	<!ENTITY scSalvagerNomad			"0x000F1001">
+	
+	<!ENTITY scCenturionBlock2			"0x00103001">
+	<!ENTITY scCenturion				"0x00103001">
+	
+	<!-- Backwards compatibility -->
+	
+	<!ENTITY scScarabFreighter			"0x00103002">
+	<!ENTITY scCenturionRama			"0x00103003">
+	<!ENTITY scCenturionX				"0x00103004">
+	<!ENTITY scAurochs					"0x00103005">
+	<!ENTITY scBorerCaptured			"0x00103006">
+	<!ENTITY scRoninJenna				"0x00103007">
+	<!ENTITY scIAVLight					"0x00103008">
+	<!ENTITY scIAVMedium				"0x00103009">
+	<!ENTITY scIAVHeavy					"0x0010300A">
+	<!ENTITY scManticore				"0x0010300B">
+	
+	<!ENTITY scIAVLightG1				"0x00143001">
+	<!ENTITY scBorerG1					"0x00143002">
+	<!ENTITY scIAVMediumG2				"0x00143003">
+	<!ENTITY scRoninG1					"0x00143004">
+	<!ENTITY scRoninG2					"0x00143005">
+	<!ENTITY scRoninG3					"0x00143006">
+	<!ENTITY scRoninG4					"0x00143007">
+	<!ENTITY scEarthzoneG2				"0x00143008">
+	<!ENTITY scEI100G1					"0x00143009">
+	<!ENTITY scEI100G2					"0x0014300A">
+	<!ENTITY scIAVHeavyG2				"0x0014300B">
+	<!ENTITY scIAVHeavyG3				"0x0014300C">
+	<!ENTITY scT31G3					"0x0014300D">
+	<!ENTITY scSapphireG2				"0x0014300E">
+	<!ENTITY scSapphireG3				"0x0014300F">
+	<!ENTITY scSapphireG4				"0x00143010">
+	<!ENTITY scEI200G3					"0x00143011">
+	<!ENTITY scEI500G2					"0x00143012">
+	<!ENTITY scEI500G4					"0x00143013">
+	<!ENTITY scEI500G5					"0x00143014">
+	<!ENTITY scManticoreG4				"0x00143015">
+	<!ENTITY scManticoreG5				"0x00143016">
+	<!ENTITY scManticoreG6				"0x00143017">
+	<!ENTITY scWolfenG4					"0x00143018">
+	<!ENTITY scWolfenG5					"0x00143019">
+	<!ENTITY scWolfenG6					"0x0014301A">
+	<!ENTITY scCenturionG5				"0x0014301B">
+	<!ENTITY scCenturionG6				"0x0014301C">
+	<!ENTITY scTheSlicerManticore		"0x0014301D">
+	
+	<!ENTITY scCorporateCruiser			"0x00153001">
+	<!ENTITY scAntaresI					"0x00153002">
+	<!ENTITY scAntaresII				"0x00153003">
+	<!ENTITY scAntaresV					"0x00153004">
+	<!ENTITY scEI200					"0x00153005">
+	<!ENTITY scEI7000					"0x00153006">
+	<!ENTITY scOrion					"0x00153007">
+	<!ENTITY scEmpress					"0x00153008">
+	<!ENTITY scWolfenVolkov				"0x00153009">
+	<!ENTITY scRoninCharonBuster		"0x0015300A">
+	<!ENTITY scKateMorgentalCruiserArena	"0x0015300B">
+	<!ENTITY scEI200CharonBuster		"0x0015300D">
+	
+	<!ENTITY scCorsair					"0x00163001">
+	<!ENTITY scViking					"0x00163002">
+	<!ENTITY scCorsair-II				"0x00163003">
+	<!ENTITY scCharonFrigateRaider		"0x00163004">
+	<!ENTITY scCharonFrigateKronosaurus	"0x00163005">
+	
+	<!ENTITY scMolotok					"0x00173001">
+	
+	<!ENTITY scSungTransport			"0x00193001">
+	<!ENTITY scWindSlaver				"0x00193002">
+	<!ENTITY scSteelSlaver				"0x00193003">
+	<!ENTITY scEarthSlaver				"0x00193004">
+	<!ENTITY scDragonSlaver				"0x00193005">
+	<!ENTITY scCarrierEarthSlaver		"0x00193006">
+	
+	<!ENTITY scCSCHospital				"0x001A3001">
+	<!ENTITY scCSCTaskForce				"0x001A3002">
+	<!ENTITY scAquilaCruiser			"0x001A3003">
+	<!ENTITY scCSCTerra					"0x001A3004">
+	<!ENTITY scCSCAntarctica			"0x001A3005">
+	<!ENTITY scEI500JuanCarlos			"0x001A3006">
+	<!ENTITY scBritannia				"0x001A3007">
+	
+	<!ENTITY scSandstorm				"0x001B3001">
+	<!ENTITY scAresAdvancedSentry		"0x001B3002">
+	<!ENTITY scAresCannon				"0x001B3002">	<!-- Duplicate for backwards compatibility -->
+	
+	<!ENTITY scPolar					"0x001B3003">
+	<!ENTITY scTundra					"0x001B3004">
+	<!ENTITY scCometfall				"0x001B3005">
+	<!ENTITY scChasm					"0x001B3006">
+	<!ENTITY scDeimos					"0x001B3007">
+	<!ENTITY scPhobos					"0x001B3008">
+	<!ENTITY scPolar2					"0x001B3009">
+	
+	<!ENTITY scIocrymCommandShip		"0x001C3001">
+	<!ENTITY scSvalbardExplorer			"0x001C3002">
+	<!ENTITY scIocrymWarningBuoy		"0x001C3003">
+	<!ENTITY scIocrymSentinel			"0x001C3004">
+	<!ENTITY scHuygensExplorer			"0x001C3005">
+	
+	<!ENTITY scPlague					"0x08010002">
+	<!ENTITY scRevelations				"0x08010003">
+	
+	<!ENTITY scHeliotropeGunship		"0x08010042">
+	<!ENTITY scHeliotropeFrigate		"0x08010043">	<!-- Reclassified -->
+	<!ENTITY scHeliotropeDestroyer		"0x08010043"> <!-- For compatibility -->
+	
+	<!ENTITY scXenophobeFighter			"0x08010082">
+	<!ENTITY scXenophobeDefender		"0x08010083">
+	<!ENTITY scXenophobeWorldship		"0x08010084">
+	<!ENTITY scXenophobeArk				"0x08010085">
+	
+	<!ENTITY scVentariDestroyer			"0x080100C1">	<!-- Reclassified -->
+	<!ENTITY scVentariCruiser			"0x080100C1"> 	<!-- For compatibility -->
+	<!ENTITY scMethEnforcer				"0x08020001">
+	
+	<!ENTITY scCentauriRaider			"0x08020042">
+
+	<!ENTITY scCentauriCommandShip		"0x08020043">
+	
+	<!ENTITY scCentauriHeavyRaider		"0x08020046">
+
+	<!ENTITY scArcoVaughnHeavyRaider	"0x0802004B">
+
+	<!ENTITY scKobolGunshipDualTeV9		"0x08020081">
+	<!ENTITY scKobolGunshipOmniTeV9		"0x08020082">
+	<!ENTITY scKobolGunshipMissiles		"0x08020083">
+
+	<!ENTITY scLuminousDrone			"0x080200C1">
+
+	<!ENTITY scHurinDestroyer			"0x08020101">
+
+	<!ENTITY scDwargRaider				"0x08020143">
+	<!ENTITY scDwargMaster				"0x08020144">
+	<!ENTITY scDwargBehemoth			"0x08020145">
+
+	<!ENTITY scZulu						"0x08030004">
+	<!ENTITY scSotho					"0x08030005">
+	<!ENTITY scOromo					"0x08030006">
+	<!ENTITY scZulu-II					"0x08030007">
+	<!ENTITY scT55ArmedTransport		"0x08030008">
+
+	<!ENTITY scTripoli					"0x08030043">
+	<!ENTITY scDrake					"0x08030044">
+	<!ENTITY scViking-II				"0x08030045">
+	<!ENTITY scMarauderRaidPlatform		"0x08030046">
+	<!ENTITY scBarbary					"0x08030047">
+
+	<!ENTITY scRepentant				"0x08030082">
+	<!ENTITY scAtonement				"0x08030083">
+
+	<!ENTITY scRogueMineLayer			"0x080300C2">
+
+	<!ENTITY scHimalInterceptor			"0x08030101">
+
+	<!ENTITY scUrakSentinel				"0x08030144">
+	<!ENTITY scUrakDestroyer			"0x08030145">
+
+	<!ENTITY scBorer					"0x08040003">
+	<!ENTITY scBorer-II					"0x08040004">
+	<!ENTITY scHammerhead				"0x08040005">
+	<!ENTITY scHammerhead-II			"0x08040006">
+
+	<!ENTITY scEarthzone				"0x08040044">
+	<!ENTITY scHornet					"0x08040045">
+
+	<!ENTITY scRanxGunship				"0x080400C2">
+	<!ENTITY scRanxDreadnought			"0x080400C3">
+
+	<!ENTITY scFerianMiner				"0x08040101">
+	<!ENTITY scFerianWarrior			"0x08040102">
+
+	<!ENTITY scGaianProcessor			"0x08040141">
+	
+		<!ENTITY scKateMorgentalCruiser	"0x00100007">
+	
+	
+	<!ENTITY scHandOfDomina				"0x00100031">
+
+	<!ENTITY scElixirMegayacht			"0x0010008C">
+
+	<!ENTITY scArmstrongTransport		"0x0010008F">
+
+	<!ENTITY scAsterionHeavyGunship		"0x00100092">
+
+	<!ENTITY scScorpionGunship			"0x00100095">
+	
+	<!ENTITY scAresSentry				"0x001000A9">
+	<!ENTITY scAresDualSentry			"0x001000AA">
+	
+	<!ENTITY scExcruciatorDestroyer		"0x00100210">
+	
+	<!ENTITY scBenedictAsterion			"0x00100230">
+	
+	<!ENTITY scStormhoundYacht			"0x00100232">
+	
+	<!ENTITY scHugoSandovalArmstrong	"0x00100234">
+	
+	<!ENTITY scFionaScorpion			"0x00100236">
+	
+	<!ENTITY scStormhoundAquila			"0x00100237">
+	
+	<!ENTITY scEI200Stock				"0x00100593">
+
+	<!ENTITY scEI200Stock				"0x00100593">
+	
+	<!ENTITY scEI100Stock				"0x00100396">
+		
+	<!ENTITY scCenturionBlock1			"0x001004B7">
+	
+	<!ENTITY scCenturionM				"0x001004BC">
+	
+	<!ENTITY scMinotaur					"0x001004C4">
+	
+	<!ENTITY scMinotaurM				"0x001004C7">
+	
+	<!ENTITY scEI500Stock				"0x00100530">
+	<!ENTITY scEI500PlayerL4A			"0x00100531">
+	<!ENTITY scEI500PlayerL4B			"0x00100532">
+	<!ENTITY scEI500PlayerL4C			"0x00100533">
+	<!ENTITY scSapphirePlayerL5A		"0x00100534">
+	<!ENTITY scSapphirePlayerL5B		"0x00100535">
+	<!ENTITY scSapphirePlayerL5C		"0x00100536">
+	<!ENTITY scWolfenPlayerL6A			"0x00100537">
+	<!ENTITY scWolfenPlayerL6B			"0x00100538">
+	<!ENTITY scWolfenPlayerL6C			"0x00100539">
+	<!ENTITY scCenturionBlock2PlayerL6	"0x0010053A">
+	<!ENTITY scEI200PlayerL4			"0x0010053B">
+	<!ENTITY scMinotaurPlayerL7			"0x0010053C">
+	<!ENTITY scMinotaurPlayerL8			"0x0010053D">
+	
+	<!ENTITY scCenturionXPlayerL7		"0x00100540">
+	<!ENTITY scEI500PlayerL3			"0x00100541">
+	<!ENTITY scSapphirePlayerL3			"0x00100542">
+	<!ENTITY scWolfenPlayerL3			"0x00100543">
+	
+	<!ENTITY scCenturionRogue			"0x00100580">
+	
+	<!ENTITY scCenturionXRogue			"0x00100583">
+	
+	<!ENTITY rsMissileNAMI				"0x00000080">
+	<!ENTITY rsMissileStrelka			"0x00000082">
+	<!ENTITY rsShipInterior				"0x0000F002">
+	<!ENTITY rsZubrinShields			"0x0000F004">
+	<!ENTITY rsZubrinArmor				"0x0000F005">
+	<!ENTITY rsZubrinLRS				"0x0000F006">
+	<!ENTITY rsZubrinTargeting			"0x0000F007">
+	<!ENTITY rsSRSSnow					"0x0000F008">
+	<!ENTITY rsZubrinLRSBorder			"0x0000F009">
+	<!ENTITY rsEI100XShields			"0x0000F00A">
+	<!ENTITY rsEI100XArmor				"0x0000F00B">
+	<!ENTITY rsZubrinReactor			"0x0000F00C">
+	<!ENTITY rsWolfenShields			"0x0000F00D">
+	<!ENTITY rsWolfenArmor				"0x0000F00E">
+	<!ENTITY rsSapphireLarge			"0x0000F00F">
+	<!ENTITY rsZubrinLarge				"0x0000F00F"> <!-- rsSapphireLarge synonym -->
+	<!ENTITY rsWolfenLarge				"0x0000F010">
+	<!ENTITY rsEI500Large				"0x0000F011">
+	<!ENTITY rsEI100XLarge				"0x0000F011"> <!-- rsEI500Large synonym -->
+	<!ENTITY rsZubrinDockScreenBkgnd	"0x0000F013">
+	<!ENTITY rsZubrinDockScreenMask		"0x0000F014">
+	<!ENTITY rsArmorHUDShip_EI500		"0x0000F015">
+	<!ENTITY rsArmorHUDShip_Sapphire	"0x0000F016">
+	<!ENTITY rsArmorHUDShip_Wolfen		"0x0000F017">
+	<!ENTITY rsMediumShips1				"0x0000F100">
+	<!ENTITY rsStations1				"0x0000F103">
+	<!ENTITY rsSmallShips1				"0x0000F104">
+	<!ENTITY rsMediumShips3				"0x0000F105">
+	<!ENTITY rsStargate					"0x0000F108">
+	<!ENTITY rsNavBeacon				"0x0000F10A">
+	<!ENTITY rsMissiles2				"0x0000F10B">
+	<!ENTITY rsDriveExhaust				"0x0000F10C">
+	<!ENTITY rsLargeShips1				"0x0000F10D">
+	<!ENTITY rsMediumShips2				"0x0000F10E">
+	<!ENTITY rsLargeExplosions			"0x0000F10F">
+	<!ENTITY rsMediumShips4				"0x0000F112">
+	<!ENTITY rsDebris1					"0x0000F114">
+	<!ENTITY rsDominaEffects1			"0x0000F115">
+	<!ENTITY rsMissiles4				"0x0000F116">
+	<!ENTITY rsBattleArena				"0x0000F117">
+	<!ENTITY rsStations2				"0x0000F118">
+	<!ENTITY rsStations3				"0x0000F11B">
+	<!ENTITY rsStations4				"0x0000F11C">
+	<!ENTITY rsShockwave1				"0x0000F11F">
+	<!ENTITY rsStations5				"0x0000F120">
+	<!ENTITY rsStations6				"0x0000F121">
+	<!ENTITY rsLargeShips2				"0x0000F124">
+	<!ENTITY rsStations7				"0x0000F126">
+	<!ENTITY rsStations8				"0x0000F127">
+	<!ENTITY rsMissiles6				"0x0000F128">
+	<!ENTITY rsBarricades				"0x0000F129">
+	<!ENTITY rsStations9				"0x0000F12A">
+	<!ENTITY rsTeratonDefender			"0x0000F12B">
+	<!ENTITY rsWeapons8DB32				"0x0000F12C">
+	<!ENTITY rsExplosionsAG256			"0x0000F12D">
+	<!ENTITY rsWeapons9DB32				"0x0000F12E">
+	<!ENTITY rsSapphireYacht			"0x0000F137">
+	<!ENTITY rsDriveExhaust2			"0x0000F138">
+	<!ENTITY rsEI500Freighter			"0x0000F13D">
+	<!ENTITY rsWolfenGunship			"0x0000F13E">
+	<!ENTITY rsPart1Cover				"0x0000F146">
+	<!ENTITY rsProlog1					"0x0000F147">
+	<!ENTITY rsEndGameEscaped			"0x0000F148">
+	<!ENTITY rsEndGameDestroyed			"0x0000F149">
+	<!ENTITY rsLogBuoy					"0x0000F14E">
+	<!ENTITY rsStdMissile1				"0x0000F14F">
+	<!ENTITY rsItemsEI1					"0x0000F150">
+	<!ENTITY rsItemsEI2					"0x0000F151">
+	<!ENTITY rsItemsEI3					"0x0000F152">
+	<!ENTITY rsItemsBushido1			"0x0000F153">
+	<!ENTITY rsItemsBushido2			"0x0000F154">
+	<!ENTITY rsItemsMakayev1			"0x0000F155">
+	<!ENTITY rsItemsMakayev2			"0x0000F156">
+	<!ENTITY rsItemsMakayev3			"0x0000F157">
+	<!ENTITY rsItemsNAMI1				"0x0000F158">
+	<!ENTITY rsItemsNAMI2				"0x0000F159">
+	<!ENTITY rsItemsNAMI3				"0x0000F15A">
+	<!ENTITY rsItemsNAMI4				"0x0000F15B">
+	<!ENTITY rsItemsRasiermesser1		"0x0000F15C">
+	<!ENTITY rsItemsRasiermesser2		"0x0000F15D">
+	<!ENTITY rsItemsRasiermesser3		"0x0000F15E">
+	<!ENTITY rsItemsRasiermesser4		"0x0000F15F">
+	<!ENTITY rsItemsTaikon1				"0x0000F160">
+	<!ENTITY rsSapphireYacht			"0x0000F161">
+	<!ENTITY rsEI500Freighter			"0x0000F162">
+	<!ENTITY rsWolfenGunship			"0x0000F163">
+	<!ENTITY rsExplorerAuton			"0x0000F164">
+	<!ENTITY rsCommonwealthSlumsImage	"0x0010F001">
+	<!ENTITY rsIAVLight					"0x0010F002">
+	<!ENTITY rsIAVMedium				"0x0010F003">
+	<!ENTITY rsIAVHeavy					"0x0010F004">
+	<!ENTITY rsStKatsArcology			"0x0010F005">
+	<!ENTITY rsStKatsArcologyScreen		"0x0010F006">
+	<!ENTITY rsStKatsArcologySchematic	"0x0010F007">
+	<!ENTITY rsManticore				"0x0010F008">
+	<!ENTITY rsIocrymMonument			"0x0010F009">
+	<!ENTITY rsIocrymMonumentScreen		"0x0010F00A">
+	<!ENTITY rsDallSphere				"0x0010F00B">
+	<!ENTITY rsBattleArenaBkgnd			"0x0014F001">
+	<!ENTITY rsBattleArenaExtra			"0x0014F002">
+	<!ENTITY rsTradingPostAnimation		"0x0015F001">
+	<!ENTITY rsContractBoardBkgnd		"0x0015F002">
+	<!ENTITY rsRasiermesserFactoryBkgnd	"0x0015F003">
+	<!ENTITY rsKorolovInsignia			"0x0015F004">
+	<!ENTITY rsKorolovLogo				"0x0015F005">
+	<!ENTITY rsAntaresIImage			"0x0015F006">
+	<!ENTITY rsEI7000Image				"0x0015F007">
+	<!ENTITY rsEI200Image				"0x0015F008">
+	<!ENTITY rsAntaresIIImage			"0x0015F009">
+	<!ENTITY rsAntaresVImage			"0x0015F00A">
+	<!ENTITY rsEI100Image				"0x0015F00B">
+	<!ENTITY rsManufacturingPlant		"0x0015F00C">
+	<!ENTITY rsRasiermesserFactory		"0x0015F00D">
+	<!ENTITY rsMakayevFactory			"0x0015F00E">
+	<!ENTITY rsCorporateCruiser			"0x0015F00F">
+	<!ENTITY rsCharonFrigateImage		"0x0016F001">
+	<!ENTITY rsMolotok					"0x0017F001">
+	<!ENTITY rsSistersShrineBkgnd		"0x0018F001">
+	<!ENTITY rsDragonSlaverImage		"0x0019F001">
+	<!ENTITY rsPointJunoBkgnd			"0x001AF001">
+	<!ENTITY rsCSCBkgnd					"0x001AF002">
+	<!ENTITY rsStationsPointJuno		"0x001AF003">
+	<!ENTITY rsBritannia				"0x001AF004">
+	<!ENTITY rsIocrymSentinel			"0x001CF001">
+	<!ENTITY rsMRADConsole				"0x001CF002">
+	<!ENTITY rsCorporateExplorer		"0x001CF005">
+	<!ENTITY rsIocrymOutpost			"0x001CF006">
+	<!ENTITY rsIocrymCommandShip		"0x001CF007">
+	<!ENTITY rsIocrymManipulator		"0x001CF008">
+	<!ENTITY rsHereticItems				"0x001CF009">
+	<!ENTITY rsMRADProbe				"0x001CF00A">
+	<!ENTITY rsTeratonChrysalis			"0x001FF001">
+	<!ENTITY rsHumanSpace				"0x00200002">
+	<!ENTITY rsShatterShockwave			"0x0020F001">
+	<!ENTITY rsXenophobeArk				"0x08010086">
+	<!ENTITY rsXenophobeWorldship		"0x08010088">
+	<!ENTITY rsPteravoreClaw			"0x08010143">
+	<!ENTITY rsPteravoreClawOverlay		"0x08010144">
+	<!ENTITY rsPteravoreDebris			"0x08010145">
+	<!ENTITY rsPteravoreLair			"0x08010147">
+	<!ENTITY rsPteravoreClawOverlay	"0x08010148">
+	<!ENTITY rsCentauriRaiderImage		"0x08020044">
+	<!ENTITY rsCentauriHeavyRaiderImage	"0x08020047">
+	<!ENTITY rsCentauriStationsImage	"0x08020049">
+	<!ENTITY rsHuariStationsImage		"0x08020109">
+	<!ENTITY rsZulu						"0x0803000A">
+	<!ENTITY rsT31ArmedTransport		"0x0803000B">
+	<!ENTITY rsT55ArmedTransport		"0x0803000C">
+	<!ENTITY rsOromo					"0x0803000D">
+	<!ENTITY rsSotho					"0x0803000E">
+	<!ENTITY rsBorer					"0x0804000C">
+	<!ENTITY rsAnarchistStations		"0x08040047">
+	<!ENTITY rsTinkerStations			"0x08040081">
+	<!ENTITY rsRanxDreadnought			"0x080400C5">
+	<!ENTITY rsFerianWarrior			"0x08040103">
+	<!ENTITY rsItems2					"0x00100023">
+	<!ENTITY rsItems3					"0x00100024">
+	<!ENTITY rsItems4					"0x00100025">
+	<!ENTITY rsItems5					"0x00100026">
+	<!ENTITY rsItems6					"0x00100027">
+	<!ENTITY rsItems7					"0x00100028">
+	<!ENTITY rsItems8					"0x00100029">
+	<!ENTITY rsItems9					"0x0010002A">
+	<!ENTITY rsItems10					"0x0010002B">
+	<!ENTITY rsSistersShrineHero		"0x00100030">
+	<!ENTITY rsHandOfDomina				"0x00100032">
+	<!ENTITY rsCathedralOfDomina		"0x00100035">
+	<!ENTITY rsHandOfDominaHero			"0x00100036">
+	<!ENTITY rsRasiermesserFactoryHero	"0x00100040">
+	<!ENTITY rsKorolovShipping			"0x00100041">
+	<!ENTITY rsKorolovShippingConstruction	"0x00100042">
+	<!ENTITY rsCorporateArmsDealer		"0x00100045">
+	<!ENTITY rsIceFarmIce				"0x00100046">
+	<!ENTITY rsIceFarmPrimordial		"0x00100047">
+	<!ENTITY rsIceFarmRocky				"0x00100048">
+	<!ENTITY rsCorporateEnclave			"0x0010004A">
+	<!ENTITY rsCorporateArmorDealer		"0x0010004B">
+	<!ENTITY rsCorporateFuelDepot		"0x0010004C">
+	<!ENTITY rsPointJunoHero			"0x00100060">
+	<!ENTITY rsFleetEmblems				"0x00100061">
+	<!ENTITY rsCSC						"0x00100062">
+	<!ENTITY rsCSCWreckage				"0x00100063">
+	<!ENTITY rsAquila					"0x00100064">
+	<!ENTITY rsAurochs					"0x00100065">
+	<!ENTITY rsAurochs				"0x00100067">
+	<!ENTITY rsBritannia				"0x00100079">
+	<!ENTITY rsCenturion				"0x0010007A">
+	<!ENTITY rsStKatsArcologyHero		"0x00100080">
+	<!ENTITY rsCommonwealthMetropolis	"0x00100081">
+	<!ENTITY rsCommonwealthMetropolisArmored	"0x00100082">
+	<!ENTITY rsCommonwealthColony		"0x00100085">
+	<!ENTITY rsCommonwealthResidentials	"0x00100086">
+	<!ENTITY rsCommonwealthAgriculturalColony	"0x00100087">
+	<!ENTITY rsCommonwealthMedicalColony	"0x00100088">
+	<!ENTITY rsCommonwealthMilitiaFortress	"0x00100089">
+	<!ENTITY rsCommonwealthArmoredColony	"0x0010008A">
+	<!ENTITY rsCommonwealthSettlement	"0x0010008B">
+	<!ENTITY rsElixirMegayacht			"0x0010008D">
+	<!ENTITY rsElixirMegayachtHero		"0x0010008E">
+	<!ENTITY rsArmstrongTransport		"0x00100090">
+	<!ENTITY rsArmstrongTransportHero	"0x00100091">
+	<!ENTITY rsAsterionHeavyGunship		"0x00100093">
+	<!ENTITY rsAsterionHeavyGunshipHero	"0x00100094">
+	<!ENTITY rsScorpionGunship			"0x00100096">
+	<!ENTITY rsScorpionGunshipHero		"0x00100097">
+	<!ENTITY rsEI7000Hero				"0x00100098">
+	<!ENTITY rsManticore120				"0x00100099">
+	<!ENTITY rsManticoreHero			"0x0010009A">
+	<!ENTITY rsIAVLight				"0x0010009D">
+	<!ENTITY rsIAVMedium				"0x0010009E">
+	<!ENTITY rsIAVHeavy				"0x0010009F">
+	<!ENTITY rsCometfall				"0x001000A0">
+	<!ENTITY rsDeimos					"0x001000A1">
+	<!ENTITY rsPolarFreighter			"0x001000A2">
+	<!ENTITY rsAresSentry				"0x001000A3">
+	<!ENTITY rsChasm					"0x001000A4">
+	<!ENTITY rsSandstorm				"0x001000A5">
+	<!ENTITY rsTundra					"0x001000A6">
+	<!ENTITY rsAresSentry				"0x001000A7">
+	<!ENTITY rsAresSentryHero			"0x001000A8">
+	<!ENTITY rsAresDualSentry			"0x001000AB">
+	<!ENTITY rsAresDualSentryHero		"0x001000AC">
+	<!ENTITY rsAresAdvancedSentry		"0x001000AD">
+	<!ENTITY rsAresAdvancedSentryHero	"0x001000AE">
+	<!ENTITY rsSalvagerNomad			"0x001000C0">
+	<!ENTITY rsUrakDestroyer			"0x001000D0">
+	<!ENTITY rsUrakSentinel			"0x001000D1">
+	<!ENTITY rsBattleArenaSegments		"0x001000E0">
+	<!ENTITY rsHeliotropeFrigate		"0x001000F0">
+	<!ENTITY rsHeliotropeGunship		"0x001000F1">
+	<!ENTITY rsTripoli					"0x00100100">
+	<!ENTITY rsBarbary				"0x00100104">
+	<!ENTITY rsCorsair				"0x00100105">
+	<!ENTITY rsViking					"0x00100106">
+	<!ENTITY rsCorsairHero				"0x00100107">
+	<!ENTITY rsVikingHero				"0x00100108">
+	<!ENTITY rsBarbaryHero				"0x00100109">
+	<!ENTITY rsSungTransport			"0x00100120">
+	<!ENTITY rsWindSlaver				"0x00100124">
+	<!ENTITY rsSteelSlaver			"0x00100125">
+	<!ENTITY rsXenophobeDefender		"0x00100140">
+	<!ENTITY rsXenophobeFighter		"0x00100141">
+	<!ENTITY rsHurin					"0x00100150">
+	<!ENTITY rsMiningPod				"0x00100170">
+	<!ENTITY rsOutlawMineIce			"0x00100182">
+	<!ENTITY rsOutlawMineMetallic		"0x00100183">
+	<!ENTITY rsOutlawMinePrimordial		"0x00100184">
+	<!ENTITY rsOutlawMineRocky			"0x00100185">
+	<!ENTITY rsOutlawMineVolcanic		"0x00100186">
+	<!ENTITY rsSotho120					"0x00100187">
+	<!ENTITY rsSothoHero				"0x00100188">
+	<!ENTITY rsBorer					"0x0010018A">
+	<!ENTITY rsHammerhead				"0x0010018B">
+	<!ENTITY rsHammerhead2			"0x0010018C">
+	<!ENTITY rsOromo					"0x0010018D">
+	<!ENTITY rsZulu					"0x0010018E">
+	<!ENTITY rsZulu2					"0x0010018F">
+	<!ENTITY rsVentariDestroyer			"0x00100190">
+    <!ENTITY rsMolotok			    "0x00100206">
+    <!ENTITY rsMolotokHero			    "0x00100207">
+	<!ENTITY rsExcruciatorDestroyer		"0x00100211">
+	<!ENTITY rsPenitentMonastery		"0x00100216">
+	<!ENTITY rsRepentantGunship			"0x00100217">
+	<!ENTITY rsRepentantGunshipHero		"0x00100218">
+	<!ENTITY rsAtonementHeavyGunship	"0x00100219">
+	<!ENTITY rsAtonementHeavyGunshipHero	"0x0010021A">
+	<!ENTITY rsMiningColonyIce			"0x00100250">
+	<!ENTITY rsMiningColonyMetallic		"0x00100251">
+	<!ENTITY rsMiningColonyPrimordial	"0x00100252">
+	<!ENTITY rsMiningColonyRocky		"0x00100253">
+	<!ENTITY rsMiningColonyVolcanic		"0x00100254">
+	<!ENTITY rsEI100					"0x0010029C">
+	<!ENTITY rsZoanthropeRaider		"0x001002D2">
+	<!ENTITY rsDwargBehemothHero		"0x001002D3">
+	<!ENTITY rsT31Transport				"0x00100330">
+	<!ENTITY rsT31TransportHero			"0x00100331">
+	<!ENTITY rsT55Transport				"0x00100332">
+	<!ENTITY rsT55TransportHero			"0x00100333">
+	<!ENTITY rsAutosentinel			"0x00100370">
+	<!ENTITY rsMediumAuton			"0x00100371">
+	<!ENTITY rs1MAuton				"0x00100372">
+	<!ENTITY rsMuleAuton				"0x00100373">
+	<!ENTITY rsExplorerAuton			"0x00100374">
+	<!ENTITY rsRoninA					"0x00100390">
+	<!ENTITY rsRonin					"0x00100390">	<!-- Backwards Compatible -->
+	<!ENTITY rsTenhove				"0x00100391">
+	<!ENTITY rsCommonwealthDryDock		"0x00100392">
+	<!ENTITY rsEI200					"0x00100394">
+	<!ENTITY rsEI200Hero				"0x00100395">
+	<!ENTITY rsEI100					"0x00100397">
+	<!ENTITY rsEI100Hero				"0x00100398">
+	<!ENTITY rsSapphire					"0x00100399">
+	<!ENTITY rsEI500					"0x0010039A">
+	<!ENTITY rsRoninAHero				"0x0010039C">
+	<!ENTITY rsRoninB					"0x0010039D">
+	<!ENTITY rsRoninBHero				"0x0010039E">
+	<!ENTITY rsRoninC					"0x0010039F">
+	<!ENTITY rsRoninCHero				"0x001003A0">
+	<!ENTITY rsIAVHeavyHero				"0x001003A1">
+	<!ENTITY rsPlague					"0x001003B0">
+	<!ENTITY rsRevelations			"0x001003B1">
+	<!ENTITY rsMethEnforcer			"0x001003D0">
+	<!ENTITY rsCentauriHeavyRaider	"0x001003F0">
+	<!ENTITY rsCentauriRaider			"0x001003F1">
+	<!ENTITY rsKobolGunshipDual		"0x00100410">
+	<!ENTITY rsKobolGunshipMissiles	"0x00100411">
+	<!ENTITY rsKobolGunshipOmni		"0x00100412">
+	<!ENTITY rsEarthzone				"0x00100430">
+	<!ENTITY rsHornet					"0x00100431">
+	<!ENTITY rsRanxGunship			"0x00100450">
+	<!ENTITY rsFerianMiner			"0x00100470">
+	<!ENTITY rsHimalInterceptor		"0x00100490">
+	<!ENTITY rsPointJuno				"0x001004B6">
+	<!ENTITY rsCenturionBlock1			"0x001004B8">
+	<!ENTITY rsCenturionBlock1Hero		"0x001004B9">
+	<!ENTITY rsCenturionBlock2			"0x001004BA">
+	<!ENTITY rsCenturionBlock2Hero		"0x001004BB">
+	<!ENTITY rsCenturionM				"0x001004BD">
+	<!ENTITY rsCenturionMHero			"0x001004BE">
+	<!ENTITY rsCenturionMDual			"0x001004BF">
+	<!ENTITY rsCenturionMDualHero		"0x001004C0">
+	<!ENTITY rsCenturionX				"0x001004C1">
+	<!ENTITY rsCenturionXHero			"0x001004C2">
+	<!ENTITY rsAurochsHero				"0x001004C3">
+	<!ENTITY rsMinotaur					"0x001004C5">
+	<!ENTITY rsMinotaurHero				"0x001004C6">
+	<!ENTITY rsMinotaurM				"0x001004C8">
+	<!ENTITY rsMinotaurMHero			"0x001004C9">
+	<!ENTITY rsMissileNAMIHeavy			"0x001004D0">
+	<!ENTITY rsWeaponTM7				"0x001004F0">
+	<!ENTITY rsWeaponTM7Fragment		"0x001004F1">
+	<!ENTITY rsLuminousDrone			"0x00100510">
+	<!ENTITY rsManticoreArmorHUD		"0x0010053E">
+	<!ENTITY rsManticoreArmorHUDSegments	"0x0010053F">
+	<!ENTITY rsCenturionRogue			"0x00100581">
+	<!ENTITY rsCenturionRogueHero		"0x00100582">
+	<!ENTITY rsCenturionXRogue			"0x00100584">
+	<!ENTITY rsCenturionXRogueHero		"0x00100585">
+	<!ENTITY rsAurochsRogue				"0x00100586">
+	<!ENTITY rsAurochsRogueHero			"0x00100587">
+	<!ENTITY rsCargoContainer			"0x001005E1">
+
+	<!--	Block SOTP HD	-->
+		<!ENTITY rsPhobosHD						"0x00830001">
+	<!ENTITY rsCorporateCruiserHD			"0x00830002">
+	<!ENTITY rsAntaresIHD					"0x00830003">
+	<!ENTITY rsAntaresIIHD					"0x00830004">
+	<!ENTITY rsAntaresVHD					"0x00830005">
+	<!ENTITY rsEI200HD						"0x00830006">
+	<!ENTITY rsSalvagerNomadHD				"0x00830007">
+	<!ENTITY rsUrakDestroyerHD				"0x00830008">
+	<!ENTITY rsEI7000HD						"0x00830009">
+	<!ENTITY rsMarauderRaidPlatformHD		"0x0083000A">
+	<!ENTITY rsDrakeHD						"0x0083000B">
+	<!ENTITY rsCharonFrigateHD				"0x0083000C">
+	<!ENTITY rsHeliotropeFrigateHD			"0x0083000D">
+	<!ENTITY rsTripoliHD					"0x0083000E">
+	<!ENTITY rsFerianWarriorHD				"0x0083000F">
+	<!ENTITY rsDwargMasterHD				"0x00830010">
+	<!ENTITY rsDwargBehemothHD				"0x00830011">
+	<!ENTITY rsScarabHD						"0x00830012">
+	<!ENTITY rsRanxDreadnoughtHD			"0x00830013">
+	<!ENTITY rsEarthSlaverHD				"0x00830014">
+	<!ENTITY rsSungTransportHD				"0x00830015">
+	<!ENTITY rsT31TransportHD				"0x00830016">
+	<!ENTITY rsT55TransportHD				"0x00830017">
+	<!ENTITY rsDragonSlaverHD				"0x00830018">
+	<!ENTITY rsXenophobeDefenderHD			"0x00830019">
+	<!ENTITY rsXenophobeWorldshipHD			"0x0083001A">
+	<!ENTITY rsXenophobeArkHD				"0x0083001B">
+	<!ENTITY rsHurinHD						"0x0083001C">
+	<!ENTITY rsCSCHD						"0x0083001D">
+	<!ENTITY rsCometfallHD					"0x0083001E">
+	<!ENTITY rsDeimosHD						"0x0083001F">
+	<!ENTITY rsPolarFreighterHD				"0x00830020">
+	<!ENTITY rsAquilaHD						"0x00830021">
+	<!ENTITY rsAurochsHD					"0x00830022">
+	<!ENTITY rsIocrymCommandShipHD			"0x00830023">
+	<!ENTITY rsIocrymSentinelHD				"0x00830024">
+	<!ENTITY rsCorporateExplorerHD			"0x00830025">
+	<!ENTITY rsVentariDestroyerHD			"0x00830026">
+	<!ENTITY rsGaianProcessorHD				"0x00830027">
+	
+	<!--	Custom Types	-->
+	
+	<!ENTITY rsEarthzoneHero			"0xA0130090">
+	<!ENTITY rsGaianProcessor			"0xA0130091">
+	<!ENTITY rsGaianProcessorHero		"0xA0130092">
+	<!ENTITY rsHimalInterceptorHero		"0xA0130093">
+	<!ENTITY rsHeliotropeFrigateHero	"0xA0130094">
+	<!ENTITY rsHeliotropeGunshipHero	"0xA0130095">
+	<!ENTITY rsLuminousDroneHero		"0xA0130096">
+	<!ENTITY rsMethEnforcerHero			"0xA0130097">
+	<!ENTITY rsMuleAutonHero			"0xA0130098">
+	<!ENTITY rsRoninBHero				"0xA0130099">
+	<!ENTITY rsSalvagerNomadHero		"0xA013009A">
+	
+	]>
+
+<TranscendenceExtension UNID="&unidExtension;"
+		name=			"Arch's Halloween Pack"
+		release=		"1"
+		version=		"1.0"
+		apiVersion=		"40"
+		extends=		"&unidHumanSpaceVol01;"
+		autoInclude=	"false"
+		credits=		"0xABCDEF / Archcannon"
+		coverImageID=	"&rsCover;"
+		>
+	<Library UNID="&unidHumanSpaceVol01;"/>
+		
+	<Image UNID="&rsCover;"	bitmap="Resources/Cover.png" loadOnUse="true"/>
+	
+	<ShipClassOverride UNID="&scEarthzone;">
+		<Image imageID="&rsEarthzone;"	imageWidth="64" imageHeight="64"	rotationCount="120"/>
+		<HeroImage imageID="&rsEarthzoneHero;" imageWidth="320" imageHeight="320"/>
+	</ShipClassOverride>
+	<Image UNID="&rsEarthzone;"	bitmap="Resources/Earthzone.png" loadOnUse="true"/>
+	<Image UNID="&rsEarthzoneHero;"	bitmap="Resources/EarthzoneHero.png" loadOnUse="true"/>
+		
+	<ShipClassOverride UNID="&scGaianProcessor;">
+		<Image imageID="&rsGaianProcessor;"	imageWidth="192" imageHeight="192"	rotationCount="120"/>
+		<HeroImage imageID="&rsGaianProcessorHero;" imageWidth="320" imageHeight="320"/>
+	</ShipClassOverride>
+	<Image UNID="&rsGaianProcessor;"	bitmap="Resources/GaianProcessor.png" loadOnUse="true"/>
+	<Image UNID="&rsGaianProcessorHero;"	bitmap="Resources/GaianProcessorHero.png" loadOnUse="true"/>
+	
+		<!-- Heliotrope Frigate -->
+<!--
+	<ShipClass UNID="&scHeliotropeFrigate;"
+			manufacturer=		"Heliotrope"
+			class=				""
+			type=				"frigate"
+			defaultSovereign=	"&svHeliotropes;"
+
+			attributes=			"genericClass, heliotropes"
+
+			size=				"100"
+			mass=				"5000"
+			thrustRatio=		"2"
+			maxSpeed=			"15"
+			cargoSpace=			"50"
+			>
+		
+		<Armor
+			armorID=			"&itSolarArmor;"
+			count=				"12"
+			/>
+		
+		<Devices>
+			<Device deviceID="&itSunflareCannon;"/>
+			<Device deviceID="&itSolonShieldGenerator;"/>
+		</Devices>
+
+		<Maneuver
+			maxRotationRate=	"9.0"
+			rotationAccel=		"1.0"
+			/>
+
+		<Interior>
+			<Compartment name="interior"
+					hitPoints=	"100"
+					/>
+			
+			<Compartment name="main drive"
+					type=		"mainDrive"
+					hitPoints=	"80"
+
+					posX=		"-24"
+					posY=		"0"
+					sizeX=		"48"
+					sizeY=		"48"
+					/>
+		</Interior>
+
+		<Items>
+			<Item				count="2d6"	item="&itHeliotropeFuel;"/>
+			<Lookup				count="1"	table="&trConsumables3;"/>
+		</Items>
+
+		<Image imageID="&rsHeliotropeFrigate;"	imageWidth="144" imageHeight="144"	rotationCount="120"/>
+		<HeroImage imageID="&rsHeliotropeFrigateHero;" imageWidth="320" imageHeight="320"/>
+
+		<Effects>
+			<Effect type="thrustMain"		posAngle="180"	posRadius="48"	posZ="0"	rotation="180"/>
+		</Effects>
+
+		<AISettings
+			aggressor=			"true"
+			fireRateAdj=		"20"
+			fireAccuracy=		"85"
+			perception=			"4"
+			/>
+
+	</ShipClass>
+	-->
+	<ShipClassOverride UNID="&scHeliotropeFrigate;"	extends="&unidHD;">
+		<Image imageID="&rsHeliotropeFrigate;"	imageWidth="144" imageHeight="144"	rotationCount="120"/>
+		<HeroImage imageID="&rsHeliotropeFrigateHero;" imageWidth="320" imageHeight="320"/>
+	</ShipClassOverride>
+	
+	<Image UNID="&rsHeliotropeFrigate;"		bitmap="Resources/HeliotropeFrigate.png" loadOnUse="true"/>
+	<Image UNID="&rsHeliotropeFrigateHD;"	bitmap="Resources/HeliotropeFrigate.png" loadOnUse="true"/>
+	<Image UNID="&rsHeliotropeFrigateHero;"	bitmap="Resources/HeliotropeFrigateHero.png" loadOnUse="true"/>
+	
+	<ShipClassOverride UNID="&scHeliotropeGunship;">
+		<Image imageID="&rsHeliotropeGunship;"	imageWidth="48" imageHeight="48"	rotationCount="120"/>
+		<HeroImage imageID="&rsHeliotropeGunshipHero;" imageWidth="320" imageHeight="320"/>
+	</ShipClassOverride>
+	
+	<Image UNID="&rsHeliotropeGunship;"		bitmap="Resources/HeliotropeGunship.png" loadOnUse="true"/>
+	<Image UNID="&rsHeliotropeGunshipHero;"	bitmap="Resources/HeliotropeGunshipHero.png" loadOnUse="true"/>
+	
+	<ShipClassOverride UNID="&scHimalInterceptor;">
+		<Image imageID="&rsHimalInterceptor;"	imageWidth="48" imageHeight="48"	rotationCount="120"/>
+		<HeroImage imageID="&rsHimalInterceptorHero;" imageWidth="320" imageHeight="320"/>
+	</ShipClassOverride>
+	<Image UNID="&rsHimalInterceptor;"		bitmap="Resources/HimalInterceptor.png" loadOnUse="true"/>
+	<Image UNID="&rsHimalInterceptorHero;"	bitmap="Resources/HimalInterceptorHero.png" loadOnUse="true"/>
+	
+	<ShipClassOverride UNID="&scLuminousDrone;">
+		<Image imageID="&rsLuminousDrone;"	imageWidth="96" imageHeight="96"	rotationCount="120"/>
+		<HeroImage imageID="&rsLuminousDroneHero;" imageWidth="320" imageHeight="320"/>
+	</ShipClassOverride>
+	<Image UNID="&rsLuminousDrone;"		bitmap="Resources/LuminousDrone.png" loadOnUse="true"/>
+	<Image UNID="&rsLuminousDroneHero;"	bitmap="Resources/LuminousDroneHero.png" loadOnUse="true"/>
+<!--
+	<ShipClassOverride UNID="&;">
+		<Image imageID="&;"	imageWidth="" imageHeight=""	rotationCount="120"/>
+		<HeroImage imageID="&;" imageWidth="320" imageHeight="320"/>
+	</ShipClassOverride>
+	<Image UNID="&;"		bitmap="Resources/.png" loadOnUse="true"/>
+	<Image UNID="&;"	bitmap="Resources/.png" loadOnUse="true"/>
+-->
+
+	<ShipClassOverride UNID="&scManticore;">
+		<Image imageID="&rsManticore;"	imageWidth="96" imageHeight="96"	rotationCount="120"/>
+		<HeroImage imageID="&rsManticoreHero;" imageWidth="320" imageHeight="320"/>
+	</ShipClassOverride>
+	<Image UNID="&rsManticore;"		bitmap="Resources/Manticore.png" loadOnUse="true"/>
+	<Image UNID="&rsManticoreHero;"		bitmap="Resources/ManticoreHero.png" loadOnUse="true"/>
+
+	<ShipClassOverride UNID="&scMethEnforcer;">
+		<Image imageID="&rsMethEnforcer;"	imageWidth="96" imageHeight="96"	rotationCount="120"/>
+		<HeroImage imageID="&rsMethEnforcerHero;" imageWidth="320" imageHeight="320"/>
+	</ShipClassOverride>
+	<Image UNID="&rsMethEnforcer;"		bitmap="Resources/MethEnforcer.png" loadOnUse="true"/>
+	<Image UNID="&rsMethEnforcerHero;"	bitmap="Resources/MethEnforcerHero.png" loadOnUse="true"/>
+	
+	<ShipClassOverride UNID="&scMuleAuton;">
+		<Image imageID="&rsMuleAuton;"	imageWidth="64" imageHeight="64"	rotationCount="120"/>
+		<HeroImage imageID="&rsMuleAutonHero;" imageWidth="320" imageHeight="320"/>
+	</ShipClassOverride>
+	<Image UNID="&rsMuleAuton;"		bitmap="Resources/MuleAuton.png" loadOnUse="true"/>
+	<Image UNID="&rsMuleAutonHero;"		bitmap="Resources/MuleAutonHero.png" loadOnUse="true"/>
+	
+	<ShipClassOverride UNID="&scRoninB;">
+		<Image imageID="&rsRoninB;"	imageWidth="48" imageHeight="48"	rotationCount="120"/>
+		<HeroImage imageID="&rsRoninBHero;" imageWidth="320" imageHeight="320"/>
+	</ShipClassOverride>
+	<Image UNID="&rsRoninB;"		bitmap="Resources/RoninB.png" loadOnUse="true"/>
+	<Image UNID="&rsRoninBHero;"	bitmap="Resources/RoninBHero.png" loadOnUse="true"/>
+	
+	<ShipClassOverride UNID="&scSalvagerNomad;">
+		<Image imageID="&rsSalvagerNomad;" imageWidth="250"	imageHeight="250"	rotationCount="120"/>
+		<HeroImage imageID="&rsSalvagerNomadHero;" imageWidth="320" imageHeight="320"/>
+	</ShipClassOverride>
+	<Image UNID="&rsSalvagerNomad;"		bitmap="Resources/SalvagerNomad.png" loadOnUse="true"/>
+	<Image UNID="&rsSalvagerNomadHero;"		bitmap="Resources/SalvagerNomadHero.png" loadOnUse="true"/>
+	
+	<ShipClassOverride UNID="&scSapphireYacht;">
+		<Image imageID="&rsSapphire;"	imageWidth="62" imageHeight="62"	rotationCount="120"/>
+		<HeroImage imageID="&rsSapphireLarge;" imageWidth="320" imageHeight="320"/>
+	</ShipClassOverride>
+	<Image UNID="&rsSapphire;"		bitmap="Resources/Sapphire.png" loadOnUse="true"/>
+	<Image UNID="&rsSapphireLarge;"	bitmap="Resources/SapphireHero.png" loadOnUse="true"/>
+	
+	<ShipClassOverride UNID="&scT31ArmedTransport;">
+		<Image imageID="&rsT31Transport;"	imageWidth="90" imageHeight="90"	rotationCount="120"/>
+		<HeroImage imageID="&rsT31TransportHero;" imageWidth="320" imageHeight="320"/>
+	</ShipClassOverride>
+	<Image UNID="&rsT31Transport;"		bitmap="Resources/T31.png" loadOnUse="true"/>
+	<Image UNID="&rsT31TransportHero;"	bitmap="Resources/T31Hero.png" loadOnUse="true"/>
+	
+	<ShipClassOverride UNID="&scT55ArmedTransport;">
+		<Image imageID="&rsT55Transport;"	imageWidth="144" imageHeight="144"	rotationCount="120"/>
+		<HeroImage imageID="&rsT55TransportHero;" imageWidth="320" imageHeight="320"/>
+	</ShipClassOverride>
+	<Image UNID="&rsT55Transport;"		bitmap="Resources/T55.png" loadOnUse="true"/>
+	<Image UNID="&rsT55TransportHero;"	bitmap="Resources/T55Hero.png" loadOnUse="true"/>
+	
+</TranscendenceExtension>

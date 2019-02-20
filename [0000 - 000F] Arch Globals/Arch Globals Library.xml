@@ -1,0 +1,3640 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!DOCTYPE TranscendenceLibrary
+[
+	<!ENTITY unidArchGlobals					"0xA0130000">
+	
+	<!ENTITY unidTempData						"0xA0130001">
+	<!ENTITY unidDamageTracker					"0xA0130002">
+	<!ENTITY unidDamageAdjustment				"0xA0130003">
+	
+	<!ENTITY unidAttackTracker					"0xA0130004">
+	<!ENTITY unidAttackMarker					"0xA0130005">
+	
+	<!ENTITY stTempMarker						"0xA0130006">
+	<!ENTITY ovDestroyTimer						"0xA0130007">
+	<!ENTITY ovOverlayEventTimer				"0xA0130008">
+	<!ENTITY ovEvalTimer						"0xA0130009">
+	<!ENTITY stEvalTimer						"0xA013000A">
+]>
+
+<TranscendenceLibrary UNID="&unidArchGlobals;"
+	name=		"Arch Globals 0.91"
+	apiVersion=	"35"
+	release=	"1"
+	credits=	"0xABCDEF (Game &amp; Forum) / Archcannon (IRC &amp; Xelerus)"
+	>
+	
+	<!--	--
+		DATA FORMAT:
+		(attribute value lifetime change)
+		Index	Name		Description	
+		0		attribute	The name of the data
+		1		value		The value of the data
+		2		lifetime	How many seconds the data will last. 'untilZero means that the data does not expire until it becomes zero
+		3		change		The amount the data changes by each second
+	<!--	-->
+	<Type UNID="&unidTempData;">
+		<Events>
+			<OnGlobalUpdate>
+				(block
+					(
+						(dataList (subset (typGetData &unidTempData; 'data) 0))
+						dataNew
+						(index 0)
+						)
+					<!--	--
+					(prnEventStart "Temp Data Global Update")
+					<!--	-->
+						
+					(for i 0 (lnkMaxIndex dataList)
+						(block
+							(
+								(entry (@ dataList index))
+								
+								(signature (@ entry 'signature))
+								(value (@ entry 'value))
+								(lifetime (@ entry 'lifetime))
+								(change (@ entry 'change))
+								
+								(value_new (+ value (/ change 2)))
+								(lifetime_new (- lifetime .5))
+								)
+							(set@ entry 'value value_new)
+							(set@ entry 'lifetime lifetime_new)
+							(switch
+								(and (eq lifetime_new 'untilZero) (ls (abs value_new) change))
+									(set@ dataList signature Nil)
+									
+								(ls lifetime_new 0.5)
+									(set@ dataList signature Nil)
+								;No expiration
+								(setq index (add index 1))
+								)
+							)
+						)
+					(enum dataList entry
+						(set@ dataNew (@ entry 'signature) entry)
+						)
+					(typSetData &unidTempData; 'data dataNew)
+					<!--	--
+					(prnEventEnd "Temp Data Global Update")
+					<!--	-->
+					)
+			</OnGlobalUpdate>
+		</Events>
+	</Type>
+	<!--	-- OLD FRAMEWORK
+	<Type UNID="&unidTempData;">
+		<Events>
+			<OnGlobalUpdate>
+				(block
+					(
+						(data (typGetData &unidTempData; 'data))
+						(index 0)
+						)
+					<!--	--
+					(prnEventStart "Temp Data Global Update")
+					<!--	--
+						
+					(for i 0 (lnkMaxIndex data)
+						(block
+							(
+								(entry (@ data index))
+								
+								(value (@ entry 1))
+								(lifetime (@ entry 2))
+								(change (@ entry 3))
+								)
+							(set@ entry 1 (+ value (/ change 2)))
+							(set@ entry 2 (- lifetime .5))
+							(if (ls lifetime 1)
+								(lnkRemove data index)
+								(setq index (add index 1))
+								)
+							)
+						)
+					(typSetData &unidTempData; 'data data)
+					<!--	--
+					(prnEventEnd "Temp Data Global Update")
+					<!--	--
+					)
+			</OnGlobalUpdate>
+		</Events>
+	</Type>
+	-->
+	<StationType UNID="&unidDamageTracker;"
+			attributes=			"damageTracker"
+			virtual=			"true"
+			>
+		
+		<Events>
+			<OnGlobalSystemCreated>
+				(objRegisterForSystemEvents (sysCreateStation &unidDamageTracker; Nil) 1000000)
+			</OnGlobalSystemCreated>
+			<OnCreate>
+			</OnCreate>
+			;Damage Tracker data name format: "from_to_damage_recent"
+			<OnSystemObjAttacked>
+				(if (and (not (objIsAbandoned aObjAttacked)) (find (list aObjAttacked aAttacker aOrderGiver) gPlayerShip))
+					(block
+						(
+							(objID (objGetID aObjAttacked))
+							(attackerID (objGetID aOrderGiver))
+							(disposition (objGetDisposition aObjAttacked aOrderGiver))
+							)
+						
+						(objIncRecentDamageByID attackerID disposition aDamageHP)
+						(objIncRecentDamageByID attackerID objID aDamageHP)
+						(objIncRecentDamageByID disposition objID aDamageHP)
+						
+						;(print (cat attackerID " [" (objGetName aOrderGiver) "] -&gt; " aDamageType " " aDamageHP " [" disposition "] -&gt; " objID " [" (objGetName aObjAttacked) "]"))
+						Nil
+						)
+					)
+			</OnSystemObjAttacked>
+		</Events>
+	</StationType>
+	<StationType UNID="&unidAttackTracker;"
+			attributes=			"attackTracker"
+			virtual=			"true"
+			>
+		
+		<Events>
+			<OnGlobalSystemCreated>
+				(sysCreateStation &unidAttackTracker; Nil)
+			</OnGlobalSystemCreated>
+			<OnCreate>
+				(block Nil
+					(atkOnCreate)
+					(atkDisable)
+					(objDestroy gSource)
+					)
+			</OnCreate>
+			<!--
+			<OnCreate>
+				(sysAddObjRecurringTimerEvent 150 gSource "OnCleanupMarkers")
+			</OnCreate>
+			-->
+			<!--	-->
+			<OnSystemObjAttacked>
+				(if (not (objIsAbandoned aObjAttacked))
+					(objFireEvent
+						gSource
+						"OnCreateMarker"
+						{
+							marker: (sysCreateMarker "&unidAttackTracker;" (objGetPos aObjAttacked) (objGetSovereign aObjAttacked))
+							object: aObjAttacked
+							type: 'attack
+							attacker: aAttacker
+							object_power: (objGetCombatPower aObjAttacked)
+							attacker_power: (objGetCombatPower aAttacker)
+							radius: (sysVectorDistance (objGetPos aObjAttacked) (objGetPos aAttacker))
+							}
+						)
+					)
+			</OnSystemObjAttacked>
+			<!--	-->
+			<OnSystemObjDestroyed>
+				(if (not (objIsAbandoned aObjDestroyed))
+					(objFireEvent
+						gSource
+						"OnCreateMarker"
+						{
+							marker: (sysCreateMarker "&unidAttackTracker;" (objGetPos aObjDestroyed) (objGetSovereign aObjDestroyed))
+							object: aObjDestroyed
+							type: 'destruction
+							attacker: aDestroyer
+							object_power: (objGetCombatPower aObjDestroyed)
+							attacker_power: (objGetCombatPower aDestroyer)
+							radius: (sysVectorDistance (objGetPos aObjDestroyed) (objGetPos aDestroyer))
+							}
+						)
+					)
+			</OnSystemObjDestroyed>
+			<OnCreateMarker>
+				(block
+					(
+						(marker (@ gData 'marker))
+						(object (@ gData 'object))
+						(type (@ gData 'type))
+						(attacker (@ gData 'attacker))
+						(radius (@ gData 'radius))
+						(nearby (filter (sysFindObject marker (cat "kA N:" radius ";")) theMarker (eq (objGetName theMarker) "&unidAttackTracker;")))
+						(object_power (@ gData 'object_power))
+						(attacker_power (@ gData 'attacker_power))
+						(severity (+ object_power attacker_power))
+						(tick (unvGetTick))
+						)
+					(prnEventStart "OnCreateMarker")
+					(objSetData marker "startTick" tick)
+					(objSetData marker "endTick" (+ tick 900))
+					
+					(objSetData marker "object_type" (objGetType object))
+					(objSetData marker "object_power" object_power)
+					(objSetData marker "attacker_type" (objGetType attacker))
+					(objSetData marker "attacker_sovereign" (objGetSovereign attacker))
+					(objSetData marker "attacker_power" attacker_power)
+					
+					(objSetData marker "radius" radius)
+					
+					(objSetProperty marker 'style 'smallCross)
+					
+					(enum nearby theNearby
+						(objIncData theNearby "endTick" (* (- 150 (objGetDistance marker theNearby)) 6))
+						)
+					;(print (cat (objGetConsoleName attacker) " --&gt; " type " --&gt; " (objGetConsoleName object)))
+					)
+			</OnCreateMarker>
+			<OnCleanupMarkers>
+				(enum (atkGetMarkers) theMarker
+					(if (gr (unvGetTick) (objGetData theMarker "endTick"))
+						(objDestroy theMarker)
+						)
+					)
+			</OnCleanupMarkers>
+		</Events>
+	</StationType>
+	
+	<StationType UNID="&stTempMarker;"
+			>
+		<Events>
+			<OnTimer>
+				(objDestroy gSource)
+			</OnTimer>
+		</Events>
+	</StationType>
+	
+	<OverlayType UNID="&ovDestroyTimer;"
+			>
+		<Events>
+			<OnDestroy>
+				(objDestroy gSource)
+			</OnDestroy>
+		</Events>
+	</OverlayType>
+	
+	<OverlayType UNID="&ovOverlayEventTimer;"
+			>
+		<Events>
+			<OnDestroy>
+				(objFireOverlayEvent gSource (objGetOverlayData gSource aOverlayID "overlayID") (objGetOverlayData gSource aOverlayID "overlayEvent"))
+			</OnDestroy>
+		</Events>
+	</OverlayType>
+	
+	<OverlayType UNID="&ovEvalTimer;"
+			>
+		<Events>
+			<OnDestroy>
+				(eval (objGetOverlayData gSource aOverlayID "code"))
+			</OnDestroy>
+		</Events>
+	</OverlayType>
+	
+	<StationType UNID="&stEvalTimer;"
+			virtual=	"true"
+			>
+		<Events>
+			<OnTimer>
+				(objDestroy gSource gSource)
+			</OnTimer>
+			<OnDestroy>
+				(eval (objGetData gSource "code"))
+			</OnDestroy>
+		</Events>
+	</StationType>
+	<!--
+	<Type UNID="&unidDamageAdjustment;">
+		<Events>
+			<OnGlobalUniverseCreated>
+				(block
+					(
+						(ship (sysCreateShip &scIocrymCommandShip; (sysVectorPolarOffset Nil 0 5000) &svIndependent;))
+						table
+						)
+					(shpRemoveAllDevices ship)
+					(objRemoveAllItems ship)
+					(enum (sort (itmGetTypes "a")) type
+						(block
+							(
+								(xml (typGetXML type))
+								(unid (typDynamicUNID (cat type "adjustment")))
+								result
+								)
+							(xmlSetAttrib (xmlGetSubElement xml 'Armor) 'hitPoints 1000000)
+							(typCreate unid xml)
+							(shpReplaceAllArmor ship (itmCreate unid 1))
+							(for i 0 15
+								(lnkAppend result (/ (objRepairArmor ship 0 (shpDamageArmor ship 0 i 1000)) 1000))
+								)
+							(typSetData type "adjustment" result)
+							(set@ table (cat type) result)
+							
+							)
+						)
+					;(print table)
+					;(printTo 'log table)
+					)
+			</OnGlobalUniverseCreated>
+		</Events>
+	</Type>
+	-->
+	
+	<Globals>
+		(block Nil
+			(printTo 'log (cat "Edge Globals Tip of the Day: "
+				(random (list
+					"Check out these awesome tips!"
+					"Transcendence still does not have an IDE"
+					"Overlay timer events still have yet to be implemented"
+					"It is currently impossible to get the keys of a struct"
+					"(= (+ 2 2) 4) -&gt; True"
+					"If your mod does not work, you should probably fix it."
+					(help)
+					(help (random (sysGlobals)))
+					"Multiverse: http://multiverse.kronosaur.com/"
+					"Ministry: http://ministry.kronosaur.com/"
+					"Xelerus: http://xelerus.de/"
+					"Forums: http://forums.kronosaur.com/"
+					"Wiki: http://wiki.kronosaur.com/"
+					"IRC: http://webchat.freenode.net"
+					(block
+							(	
+								(number1 (random 1 1000))
+								(number2 (random 1 1000))
+								(operator (random (list
+									add	subtract	multiply	divide	modulo	power	gr		ls		eq	geq		leq		neq
+									+	-			*			/		mod		pow		&gt;	&lt;	=	&gt;=	&lt;=	!=
+									and or max min list append random
+									)))
+								(code
+									(cat
+										"("
+										operator
+										" "
+										number1
+										" "
+										number2
+										")"
+										)
+									)
+								(result (operator number1 number2))
+								)
+							(cat code " -&gt; " result)
+							)
+					))
+				))
+			(printTo 'log "This has been your Edge Globals Tip of the Day! For more tips, subscribe to ProTips and get a tip sent directly to your ship&apos;s computer every five minutes!")
+			
+			;Does not throw an error when input is Nil
+			(setq apply2 (lambda (func input)
+				(if input
+					(apply func input)
+					Nil
+					)
+				))
+			<!--	Item	-->
+			(setq itmGetAdjustedHP (lambda (itemType damageType)
+				(@Check (mapInt (splitIndent (itmGetProperty itemType 'adjustedHP))) (dmgTypeCheck damageType))
+				))
+			(setq itmGetAdjustedHPByType (lambda (itemType)
+				(block	(
+							result
+							(adjusted (map (split (itmGetProperty itemType 'adjustedHP) "\t") theAdjusted (int theAdjusted)))
+							)
+					(for i 0 (- (count adjusted) 1)
+						(set@ result (dmgTypeName i) (@ adjusted i))
+						)
+					result
+					)
+				))
+			<!--	Object	-->
+			
+			<!--	System	-->
+			(setq sysCalcFireSolution2 (lambda (source target speed)
+				(sysCalcFireSolution
+					(sysVectorSubtract (objGetPos target) (objGetPos source))
+					(sysVectorSubtract (objGetVel target) (objGetVel source))
+					speed
+					)
+				))
+			;Finds objects matching the first criteria that are not surrounded by objects matching the avoid criteria
+			(setq sysFindObjectAvoid (lambda (center criteria_find criteria_avoid)
+				(filter (sysFindObject center criteria_find) object (not (sysFindObject object criteria_avoid)))
+				))
+			(setq sysFindObjectFlood (lambda (center criteria)
+				(block
+					(
+						;Start the flood
+						(objects
+							(filterDuplicates
+								(sysFindObjectFloodLoop
+									center
+									criteria
+									)
+								)
+							)
+						)
+					;Clear the flood data on all flooded objects so that they can be flooded again next time
+					 (enum objects theObject (objSetData theObject "flooded" Nil))
+					 
+					 ;Return the objects
+					 objects
+					)
+				))
+			(setq sysFindObjectFloodLoop (lambda (center criteria)
+				(block
+					(
+						;Get all objects that have not been flooded already using the same criteria
+						(objects
+							(filter
+								(sysFindObject
+									center
+									criteria
+									)
+								theObject
+								(not (objGetData theObject "flooded"))
+								)
+							)
+						)
+					
+					;Set this object to flooded so that it doesn't appear more than one time in a single flood
+					(objSetData center "flooded" True)
+					
+					;Include this object in its own return. If there are other objects, flood them. Else, finish
+					(append
+						(list center)
+						(if objects
+						
+							;Clear duplicates from sub-floods
+							(filterDuplicates
+								;Condense all sub-floods into one list
+								(apply
+									append
+									
+									;Run sub-floods on all found objects
+									(map
+										objects
+										theObject
+										(sysFindObjectFlood
+											theObject
+											criteria
+											)
+										)
+									)
+								)
+							)
+						)
+					)
+				))
+				
+			(setq sysVectorRectangularOffset (lambda (x y)
+				(sysVectorPixelOffset Nil (* x 23.98339664) (* y 23.98339664))
+				))
+			(setq sysVectorPolarToRectangular (lambda (vector)
+				(block
+					(
+						(angle (sysVectorAngle vector))
+						(distance (sysVectorDistance vector))
+						)
+					(list (* (cos angle) distance) (* (sin angle) distance))
+					)
+				))
+			(setq sysVectorRectangularToPolar (lambda (point)
+				(apply sysVectorRectangularOffset (append (list Nil) point))
+				))
+			(setq sysVectorCenter (lambda (vectorList)
+				(block
+					(
+						(points (map vectorList vector (sysVectorRectangularCoordinates vector)))
+						(xList (map points point (@ point 0)))
+						(yList (map points point (@ point 1)))
+						(xCenter (average xList))
+						(yCenter (average yList))
+						)
+					(list xCenter yCenter)
+					)
+				))
+			(setq sysAddEvalTimer (lambda (delay code)
+				(block
+					(
+						(timer (sysCreateStation &stEvalTimer; Nil))
+						)
+					(sysAddObjTimerEvent delay timer "OnTimer")
+					(objSetData timer "code" code)
+					)
+				))
+			(setq sysCreateTempMarker (lambda (pos lifetime)
+				(sysAddObjTimerEvent lifetime (sysCreateStation &stTempMarker; pos) "OnTimer")
+				))
+			<!--	List	-->
+			;Compares two lists and returns a list of items from the target list that the source list does not contain
+			(setq diff (lambda (source target)
+				(block
+					(
+						result
+						(source2 source)	;Pointers
+						)
+					(enum target entry
+						(block ((index (find source2 entry)))
+							(if index
+								(lnkRemove source2 index)
+								(lnkAppend result entry)
+								)
+							)
+						)
+					result
+					)
+				))
+				
+			<!--	List (Pointer)	-->
+			<!--
+				CATEGORY	NAME		Description
+				Input		source		The list to take an item from. 
+				Input		index		The index of the item to take
+				
+				Return: The item from the list at the specified index.
+				
+				Notes: The item will also be removed from the list
+				
+			-->
+			;Return a random entry from a list while at the same time removing it from the list
+			(setq lnkTake (lambda (source index)
+				(block
+					(
+						(result (@ source index))
+						)
+					(lnkRemove source index)
+					result
+					)
+				))
+				
+			(setq lnkAppendUnique (lambda (target entry)
+				(if (find target entry)
+					Nil
+					(lnkAppend target entry)
+					)
+				))
+				
+			(setq lnkMaxIndex (lambda (source)
+				(subtract (count source) 1)
+				))
+			(setq lnkMerge (lambda (sourceList)
+				(block
+					(
+						result
+						)
+					(enum sourceList theList
+						(enum theList theEntry
+							(lnkAppendNew result theEntry)
+							)
+						)
+					)
+				))
+			(setq lnkAppendNew (lambda (source target)
+				(if (not (find source target))
+					(lnkAppend source target)
+					)
+				))
+			(setq lnkTransfer (lambda (from index to)
+				(block
+					(
+						(result (@ from index))
+						)
+					(lnkAppend to result)
+					(lnkRemove from index)
+					to
+					)
+				))
+			<!--
+			(setq rfmFatherOnMaintenance (lambda Nil
+				(block
+					(
+						(docked (sysFindObject gSource "sA O:docked"))
+						)
+					Nil
+					)
+				))
+			(setq rfmFatherOnEnemyCheck (lambda Nil
+				(block
+					(
+						(enemies (rfmGetEnemies gSource))
+						(sons (rfmGetSubordinates gSource &scSon;))
+						)
+					(enum enemies enemy
+						(block
+							(
+								(enemyPower (objGetCombatPower enemy))
+								(attackerPower (apply + (map (sysFindObjectOrder gSource "sA" 'attack enemy) obj (objGetCombatPower obj))))	;The total power of ships that are already attacking the enemy
+								shipsNeeded	;The list of ships that will be sent to attack
+								shipsPower 	;The total power of the ships
+								)
+							(loop (and sons (gr enemyPower shipsPower))
+								(block ((ship (@ sons 0)))
+									(lnkRemove sons 0)
+									(lnkAppend shipsNeeded ship)
+									(setq shipsPower (add shipsPower (objGetCombatPower ship)))
+									)
+								)
+							(if (gr shipsPower enemyPower)
+								(enum shipsNeeded ship
+									(shpOrderImmediate ship 'attack enemyPower)
+									)
+								)
+							)
+						)
+					)
+				))
+			(setq rfmGetSubordinates (lambda (leader type)
+				(filter
+					(sysFindObject
+						leader
+						(if type (cat "sA +unid:" type ";") "sA")
+						obj
+						(or
+							(eq (objGetObjRefData obj "leader") leader)
+							(eq (objGetOrderGiver obj) leader)
+							)
+						)
+					)
+				))
+			(setq rfmSetLeader (lambda (subordinate leader)
+				(objSetObjRefData subordinate "leader" leader)
+				))
+			(setq rfmGetLeader (lambda (subordinate)
+				(objGetObjRefData subordinate "leader")
+				))
+			(setq rfmAddEnemy (lambda (source enemy)
+				(objAppendObjRefDataList source "enemyList" enemy)
+				))
+			(setq rfmGetEnemies (lambda (source)
+				(objGetObjRefDataList source "enemyList")
+				))
+			(setq rfmSetDefaultSupplies (lambda (object)
+				(block
+					(
+						(cargo (itmListToTypeList (objGetItems object "*U")))
+						(devices (itmListToTypeList (objGetItems object "dI")))
+						(armor (itmListToTypeList (objGetItems object "aI")))
+						)
+					(objSetData object 'supplies_cargo cargo)
+					(objSetData object 'supplies_devices devices)
+					(objSetData object 'supplies_armor armor)
+					(objSetData
+						object
+						'supplies_all
+						{
+							cargo: cargo
+							devices: devices
+							armor: armor
+							}
+						)
+					)
+				))
+			(setq rfmGetDefaultSupplies (lambda (object)
+				(objGetData object 'supplies_all)
+				))
+			(setq rfmGetSuppliesNeeded (lambda (object)
+				(block
+					(
+						(default (objGetDefaultSupplies object))
+						(default_cargo (@ default 'cargo))
+						(default_devices (@ default 'devices))
+						(default_armor (@ default 'armor))
+						(current_cargo (itmListToTypeList (objGetItems object "*U")))
+						(current_devices (itmListToTypeList (objGetItems object "dI")))
+						(current_armor (itmListToTypeList (objGetItems object "aI")))
+						(needed_cargo (diff current_cargo default_cargo))
+						(needed_devices (diff current_devices default_devices))
+						(needed_armor (diff current_armor default_armor))
+						)
+					{
+						cargo: needed_cargo
+						devices: needed_devices
+						armor: needed_armor
+						}
+					)
+				))
+			-->
+			(setq shpDuplicate (lambda (ship)
+				(block	(
+							(duplicate (sysCreateShip (objGetType ship) (objGetPos ship) (objGetSovereign ship)))
+							)
+					(shpRemoveAllDevices duplicate)
+					(objEnumItems ship "dI" theDevice
+						(shpInstallNewDevice duplicate (itmSetProperty theDevice 'installed Nil))
+						)
+					(for i 0 (- (shpGetArmorCount ship) 1)
+						(shpInstallNewArmor duplicate (itmSetProperty (shpGetArmor ship i) 'installed Nil) i)
+						)
+					(objRemoveAllItems duplicate)
+					(objEnumItems ship "*U" theCargo
+						(objAddItem duplicate theCargo)
+						)
+					)
+				))
+				
+			<!--	-->
+			(setq itmListToTypeList (lambda (itemList)
+				(block (result)
+					(enum itemList theItem
+						(block ((type (itmGetType theItem)))
+							(for i 1 (itmGetCount theItem)
+								(lnkAppend result type)
+								)
+							)
+						)
+					result
+					)
+				))
+			(setq take (lambda (source target)
+				(block
+					(
+						(result_index (find source target))
+						(result_entry (@ source result_index))
+						)
+					(lnkRemove source result_index)
+					result_entry
+					)
+				))
+			<!--	-->
+			(setq objSetObjRefDataList (lambda (object attribute otherList)
+				(for i 0 (- (count otherList) 1)
+					(objSetObjRefData object (cat attribute "_" i))
+					)
+				))
+			(setq objAppendObjRefDataList (lambda (object attribute other)
+				(block
+					(
+						(refCount (objGetData object (cat attribute "_count")))
+						)
+					(if (not refCount)
+						(setq refCount 0)
+						)
+					(objSetObjRefData object (cat attribute "_" refCount) other)
+					(objSetData object (cat attribute "_count") (+ refCount 1))
+					)
+				))
+			(setq objGetObjRefDataList (lambda (object attribute)
+				(block
+					(
+						(refCount (objGetData object (cat attribute "_count")))
+						result
+						)
+					(for i 0 (- refCount 1)
+						(lnkAppend result (objGetObjRefData object (cat attribute "_" i)))
+						)
+					(lnkRemoveNil result)
+					)
+				))
+			(setq objClearRefDataList (lambda (object attribute)
+				(for i 0 (- (objGetData object (cat attribute "_count")) 1)
+					(objSetObjRefData object (cat attribute "_" i) Nil)
+					)
+				))
+			(setq objRemoveRefDataList (lambda (object attribute other)
+				(block
+					(
+						(refCount (objGetData object (cat attribute "_count")))
+						(refList (objGetObjRefDataList object attribute))
+						)
+					(objSetObjRefData object (cat attribute "_" (find refList other)) Nil)
+					)
+				))
+		
+			(setq root (lambda (input degree)
+				(pow input (/ 1 degree))
+				))
+			(setq itmGetDamageName (lambda (itemType)
+				(dmgTypeName (itmGetDamageType itemType))
+				))
+			(setq itmGetDamageMultiplierByType (lambda (itemType)
+				(block ((damageAdj (itmGetProperty itemType 'damageAdj)))
+					(enum (@ damageAdj) theKey (set@ damageAdj theKey (/ (@ damageAdj theKey) 100)))
+					damageAdj
+					)
+				))
+			(setq itmGetDamageAdj (lambda (itemType damageType)
+				(@Check (mapInt (splitIndent (itmGetProperty itemType 'damageAdj))) (dmgTypeCheck damageType))
+				))
+			;If the index is nil, return the whole list
+			(setq @Check (lambda (source index)
+				(if index
+					(@ source index)
+					source
+					)
+				))
+			(setq mapInt (lambda (source)
+				(map source entry (int entry))
+				))
+			(setq indent "\t")
+			(setq strRemove (lambda (str target)
+				(apply cat (split str target))
+				))
+			(setq splitIndent (lambda (source)
+				(split source "\t")
+				))
+			(setq dmgTypeCheck (lambda (damageType)
+				(if (isInt damageType)
+					damageType
+					(find dmgNameList damageType)
+					)
+				))
+			(setq dmgTypeName (lambda (damageType)
+				(@ dmgNameList damageType)
+				))
+			(setq dmgNameList '(laser kinetic particle blast ion thermo positron plasma antimatter nano graviton singularity darkAcid darkSteel darkLightning darkFire))
+			(setq rndEven (lambda (min max)
+				(* (random (divide min 2) (divide max 2)) 2)
+				))
+			(setq roundEven (lambda (n)
+				(if (geq (mod n 2) 1)
+					(if (isWhole n)
+						(add n 1)
+						(ceil n)
+						)
+					(floor n)
+					)
+				))
+			(setq isWhole (lambda (n)
+				(if (eq (mod n 1) 0)
+					True
+					Nil
+					)
+				))
+			(setq isEven (lambda (n)
+				(eq (modulo n 2) 0)
+				))
+			(setq isOdd (lambda (n)
+				(eq (modulo n 2) 1)
+				))
+				
+			(setq intParity (lambda (n)
+				(@ '(even odd) (modulo n 2))
+				))
+			;Selects the first item in the list if the index is less than 0
+			(setq @min (lambda (theList theIndex)
+				(@ theList (min 0 theIndex))
+				))
+			;Selects the last item in the list of the index is greater than the maximum index
+			(setq @max (lambda (theList theIndex)
+				(@ theList (max theIndex (- (count theList) 1)))
+				))
+			;Combines @min and @max
+			(setq @range (lambda (theList theIndex)
+				(@ theList (range theIndex 0 (- (count theList) 1)))
+				))
+			;Returns Nil if the index is not within 0 and (- (count input) 1)
+			(setq @within (lambda (theList theIndex)
+				(switch
+					(ls theIndex 0)
+						Nil
+					(gr theIndex (- (count theList) 1))
+						Nil
+					(@ theList theIndex)
+					)
+				))
+			;Warning: Pointers do not always work
+			(setq inc@ (lambda (source index inc)
+				(set@ source index (+ (@ source index) inc))
+				))
+			(setq append@ (lambda (source index entry)
+				(set@ source index (append (@ source index) (list entry)))
+				))
+			(setq remove@ (lambda (source index subindex)
+				(set@ source index (remove (@ source index) subindex))
+				))
+				
+			<!--
+			Input	Output
+			0			0
+			1			1
+			2		-	1
+			3			2
+			4		-	2
+			5			3
+			6		-	3
+			7			4
+			8		-	4
+			9			5
+			10		-	5
+			-->
+			(setq alternate (lambda (n)
+				(block ((parity (intParity n)))
+					(switch
+						(eq n 0)
+							0
+						
+						(eq parity 'odd)
+							(divide (+ n 1) 2)
+						
+						(eq parity 'even)
+							(- (divide n 2))
+						)
+					)
+				))
+			<!---->
+		
+			(setq atkOnCreate (lambda Nil
+				(block Nil
+					(typSetData &unidAttackTracker; (sysGetNode) (objGetID gSource))
+					(objRegisterForSystemEvents gSource 1000000)
+					)
+				))
+			(setq atkDisable (lambda (node)
+				(objSuspend
+					(objGetObjByID
+						(typGetData &unidAttackTracker;
+							(if node
+								node
+								(sysGetNode)
+								)
+							)
+						)
+					)
+				))
+			(setq atkEnable (lambda (node)
+				(objResume
+					(typGetData &unidAttackTracker;
+						(if node
+							node
+							(sysGetNode)
+							)
+						)
+					)
+				))
+			(setq atkGetMarkers (lambda (sovereign)
+				(filter
+					(sysFindObject
+						Nil
+						(if sovereign
+							(cat "k J:" sovereign ";")
+							"k"
+							)
+						)
+					marker
+					(eq
+						(objGetName
+							marker
+							)
+						"&unidAttackTracker;"
+						)
+					)
+				))
+			(setq atkGetNearbyMarkers (lambda (center)
+				(filter (sysFindObject center "k J N:100;") marker (eq (objGetName marker) "&unidAttackTracker;"))
+				))
+				
+			;Condenses regions into single markers in order of density
+			(setq atkMergeMarkers (lambda Nil
+				(block ((all (atkGetMarkers)))
+					(loop all
+						(block
+							(
+								;Convert each marker into a list of other markers near it
+								(surroundingMarkers
+									(map all m1
+										(block ((radius (objGetData m1 "radius")))
+											(filter all m2
+												(ls (objGetDistance m1 m2) radius)
+												)
+											)
+										)
+									)
+								
+								;Convert each list of markers into its length
+								(surroundingCount
+									(map surroundingMarkers theMarkers (count theMarkers))
+									)
+									
+								;Find the index of the marker surrounded by the most markers; this marker represents the densest region
+								(regionIndex (maxIndex surroundingCount))
+								
+								(regionCenter (@ all regionIndex)) ;This is the marker at the center of the region
+								(regionMarkers (@ surroundingMarkers regionIndex)) ;This is the list of markers surrounding the center
+								(regionPos (objGetPos regionCenter)) ;This is the position of the center
+								(regionDistances (map regionMarkers marker (+ (objGetDistance regionCenter marker) (objGetData marker "radius"))))
+								(regionRadius (apply max (map regionMarkers marker (objGetDistance regionCenter marker)))) ;This is determined by the marker with the largest combined distance and effect radius
+								(regionSeverity (apply + (map regionMarkers marker (objGetData marker "severity"))))
+								(regionSovereign (objGetSovereign regionCenter))
+								(regionMarkerNew (sysCreateMarker "&unidAttackTracker;" regionPos regionSovereign))
+								)
+							(lnkRemoveItemMultiple all regionMarkers)
+							(enum regionMarkers marker (objDestroy marker))
+							(objSetData regionMarkerNew "radius" regionRadius)
+							(objSetData regionMarkerNew "severity" regionSeverity)
+							)
+						)
+					)
+				))
+				
+			(setq atkGetMarkerRegion (lambda (source)
+				(block
+					(
+						(active True)
+						region
+						(newest (list source))
+						(markers (atkGetMarkers))
+						)
+					(loop active
+						(block (newestNext marker)
+							(setq active Nil)
+							(enum newest center
+								(block ((index))
+									(loop (ls index (lnkMaxIndex markers))
+										(if (ls (objGetDistance center (setq marker (@ markers index))) 100)
+											(block Nil
+												(lnkRemove markers index)
+												(lnkAppend region marker)
+												(lnkAppend newestNext marker)
+												(setq active True)
+												)
+											(setq index (+ index 1))
+											)
+										)
+									)
+								)
+							(setq newest newestNext)
+							)
+						)
+					region
+					)
+				))
+			(setq objGetHighestLevelItem (lambda (object criteria)
+				(block	(
+							(result_item Nil)
+							(result_level 0)
+							)
+					(objEnumItems object criteria theItem
+						(if (gr (itmGetLevel theItem) result_level)
+							(block Nil
+								(setq result_item theItem)
+								(setq result_level (itmGetLevel theItem))
+								)
+							)
+						)
+					)
+				))
+			(setq shpGetOrderStack (lambda (ship)
+				(map (make 'sequence 0 (- (shpGetOrderCount ship) 1)) theIndex
+					(shpGetOrderDesc theIndex)
+					)
+				))
+			(setq shpHasOrderDesc (lambda (ship order target)
+				(block	(
+							(result Nil)
+							)
+					(enumWhile (make 'sequence 0 (- (shpGetOrderCount ship) 1)) (not result) theIndex
+						(block ((desc (shpGetOrderDesc ship theIndex)))
+							(if (and (eq (@ desc 0) order) (eq (@ desc 1) target))
+								(setq result theIndex)
+								)
+							)
+						)
+					)
+				))
+			(setq shpCancelOrderDesc (lambda (ship order target)
+				(for i 0 (- (shpGetOrderCount ship) 1)
+					(block ((desc (shpGetOrderDesc ship i)))
+						(if (and (eq (@ desc 0) order) (eq (@ desc 1) target))
+							(shpCancelOrder ship i)
+							)
+						)
+					)
+				))
+			(setq shpOrderNew (lambda (ship order target data1 data2)
+				(block Nil
+					(shpCancelOrderDesc ship order target)
+					(shpOrder ship order target data1 data2)
+					)
+				))
+			(setq shpOrderImmediateNew (lambda (ship order target data1 data2)
+				(block Nil
+					(shpCancelOrderDesc ship order target)
+					(shpOrderImmediate ship order target data1 data2)
+					)
+				))
+			(setq shpGetMostDamagedArmor (lambda (ship)
+				(block	(
+							(result_item Nil)
+							(result_damage 0)
+							)
+					(for i 0 (- (shpGetArmorCount ship) 1)
+						(if (geq (objGetArmorDamage ship) result_damage)
+							(block Nil
+								(setq result_item (shpGetArmor ship i))
+								(setq result_damage (objGetArmorDamage ship))
+								)
+							)
+						)
+					result_item
+					)
+				))
+			(setq shpGetArmorSegments (lambda (ship)
+				(map (make 'sequence 0 (- (shpGetArmorCount ship) 1)) theIndex
+					(shpGetArmor ship theIndex)
+					)
+				))
+			<!--
+			(setq shpGetAverageAdjustedHP (lambda (ship damageType)
+				(block
+					(
+						(armors (objGetItems ship "aI"))
+						(armors_adjustedHP (map armors theArmor (itmGetAdjustedHP theArmor damageType)))
+						(armors_average (average armors_adjustedHP))
+						)
+					armors_average
+					)
+				))
+			-->
+			<!--
+			;Enumerates the object's installed weapons and finds the most effective one against the other object (has the fastest minimum time needed to destroy)
+			(setq objGetBestWeaponAgainst (lambda (object other)
+				(block
+					(
+						(object_weapons (objGetItems object "wI"))
+						(object_weapons_effectiveness (map object_weapons theWeapon (wpnGetAverageTimeNeeded (itmGetDamageType theWeapon) other 'object)))
+						(object_weapons_best_effectiveness (apply min object_weapons_effectiveness))
+						(object_weapons_best_index (find object_weapons_effectiveness object_weapons_best_effectiveness))
+						(object_weapons_best_item (@ object_weapons object_weapons_best_index))
+						)
+					object_weapons_best_item
+					)
+				))
+			-->
+			(setq objAddEvalTimer (lambda (object delay code)
+				(objSetOverlayData object (objAddOverlay object &ovEvalTimer; delay) "code" code)
+				))
+			(setq objAddOverlayTimer (lambda (object overlayID delay overlayEvent)
+				(block
+					(
+						(timer (objAddOverlay object &ovOverlayEventTimer; delay))
+						)
+					(objSetOverlayData gSource timer "overlayID" overlayID)
+					(objSetOverlayData gSource timer "overlayEvent" overlayEvent)
+					timer
+					)
+				))
+			(setq objAddDestroyTimer (lambda (object delay)
+				(objAddOverlay object &ovDestroyTimer; delay)
+				))
+			(setq objOrderGiver (lambda Nil
+				(switch
+					(objCanDetectTarget gSource aOrderGiver)
+						aOrderGiver
+					
+					(objCanDetectTarget gSource aAttacker)
+						aAttacker
+						
+					aAttacker
+						aAttacker
+						
+					aOrderGiver
+						aOrderGiver
+					)
+				))
+			<!--
+			(setq itmGetFrequencyLetter (lambda (itemType)
+				(itmGetProperty itemType 'frequency)
+				))
+			(setq itmGetFrequencyNumber (lambda (itemType)
+				(@ (lookup '((C 20) (U 10) (R 4) (V 1) (Nil 0)) (itmGetFrequencyLetter itemType) 0) 1)
+				))
+			-->
+			<!--DEPRECATED
+			(setq itmGetAdjustedHP (lambda (itemType damageType)
+				(if damageType
+					(@ (itmGetProperty itemType 'adjustedHP) (dmgTypeCheck damageType))
+					(itmGetProperty itemType 'adjustedHP)
+					)
+				))
+			(setq itmGetBalance (lambda (itemType)
+				(itmGetProperty itemType 'balance)
+				))
+			(setq itmGetDamageAdj (lambda (itemType damageType)
+				(if damageType
+					(@ (itmGetProperty itemType 'damageAdj) (dmgTypeCheck damageType))
+					(itmGetProperty itemType 'damageAdj)
+					)
+				))
+			(setq itmGetEffectiveHP (lambda (itemType damageType)
+				(if damageType
+					(@ (itmGetProperty itemType 'effectiveHP) (dmgTypeCheck damageType))
+					(itmGetProperty itemType 'effectiveHP)
+					)
+				))
+			-->
+			<!--
+			(setq shpGetMatchup (lambda (ship1 ship2)
+				(block	(
+							(totalHPByType_ship1 (shpGetTotalHPByType ship1))
+							(totalHPByType_ship2 (shpGetTotalHPByType ship2)) 
+							(damageByType_ship1 (shpGetDamageByType ship1))
+							(damageByType_ship2 (shpGetDamageByType ship2))
+							;In seconds
+							(minSurvivalTime_ship1
+								(apply2 min (map dmgNameList 'excludeNil theDamageType
+									(block	(
+												(damage_ship2 (@ damageByType_ship2 theDamageType))
+												)
+										;Avoid division by 0
+										(if (gr damage_ship2 0)
+											(/ (@ totalHPByType_ship1 theDamageType) damage_ship2)
+											)
+										)
+									))
+								)
+							;In seconds
+							(minSurvivalTime_ship2
+								(apply2 min (map dmgNameList 'excludeNil theDamageType
+									(block	(
+												(damage_ship1 (@ damageByType_ship1 theDamageType))
+												)
+										;Avoid division by 0
+										(if (gr damage_ship1 0)
+											(/ (@ totalHPByType_ship2 theDamageType) damage_ship1)
+											)
+										)
+									))
+								)
+							)
+					;Ratio between survival time of ship1 and survival time of ship2
+					(switch
+						(not minSurvivalTime_ship2)
+							"Definite Win"
+						(not minSurvivalTime_ship1)
+							"Definite Loss"
+						(/ minSurvivalTime_ship1 minSurvivalTime_ship2)
+						)
+					)
+				))
+			-->
+			<!--
+			(setq shpGetDamageByType (lambda (ship)
+				(block	(
+							primary	;Each entry is the damage dealt by the ship's most powerful weapon of that damage type
+							linked	;Each entry is the total damage dealt by the ship's linked fire weapons of that damage type
+							launcher ;Each entry is the damage dealt by the ship's most powerful launcher of that damage type
+							result
+							)
+					(objEnumItems ship "wI" theWeapon
+						(switch
+							(eq (itmGetProperty theWeapon 'category) 'launcher)
+								(setq launcher (inc@ launcher (itmGetDamageName theWeapon) (itmGetProperty theWeapon 'damage)))
+								
+							;Linked damage is additive
+							(itmGetProperty theWeapon 'linkedFireOptions)
+								(setq linked (inc@ linked (itmGetDamageName theWeapon) (itmGetProperty theWeapon 'damage)))
+							
+							(block	(
+										(damageName (itmGetDamageName theWeapon))
+										)
+								(set@ primary damageName (max (@ primary damageName) (itmGetProperty theWeapon 'damage)))
+								)
+							)
+						)
+					(enum dmgNameList theName
+						;Get damage per second by dividing damage per 180 ticks by 6.
+						(set@ result theName (/ (+ (@ primary theName) (@ linked theName) (@ launcher theName)) 6))
+						)
+					result
+					)
+				))
+			-->
+			
+			<!--	These functions are defined in Edge Globals Library
+			;Warning: Pointers do not always work
+			(setq inc@ (lambda (source index inc)
+				(set@ source index (+ (@ source index) inc))
+				))
+			(setq dmgNameList '(laser kinetic particle blast ion thermo positron plasma antimatter nano graviton singularity darkAcid darkSteel darkLightning darkFire))
+			-->
+			(setq shpGetShieldHP (lambda (ship)
+				(- (shpGetShieldMaxHitPoints ship) (shpGetShieldDamage ship))
+				))
+			(setq shpGetMinArmorPercentage (lambda (ship)
+				(apply min (map (objGetItems ship "aI") theArmor (/ (itmGetProperty theArmor 'hp) (itmGetProperty theArmor 'maxHP))))
+				))
+			(setq shpGetMinHP (lambda (ship)
+				(apply min (map (objGetItems ship "aI") theArmor (itmGetProperty theArmor 'hp)))
+				))
+			;Struct containing average damage adjustment percentage of each damage type for all installed armor segments and shield generators on the ship
+			(setq shpGetAverageDamageAdjByType (lambda (ship)
+				(block ((defense (objGetItems ship "asI")) (defenseCount (count defense)) result)
+					(enum defense theDefense
+						(block	((damageAdj (itmGetProperty theDefense 'damageAdj)))
+							(enum dmgNameList theDamageType
+								(setq result (inc@ result theDamageType (@ damageAdj theDamageType)))
+								)
+							)
+						)
+					(enum dmgNameList theDamageType
+						(set@ result theDamageType (/ (@ result theDamageType) defenseCount))
+						)
+					result
+					)
+				))
+			;Converts average damage adjustment percentage for each type to a multiplier
+			(setq shpGetAverageDamageMultiplierByType (lambda (ship)
+				(block ((result (shpGetAverageDamageAdjByType ship)))
+					(enum dmgNameList theDamageType
+						(set@ result theDamageType (/ (@ result theDamageType) 100))
+						)
+					result
+					)
+				))
+			;Returns unadjusted hp
+			(setq shpGetTotalHP (lambda (ship)
+				(+ (apply add (map (objGetItems ship "aI") theArmor (itmGetProperty theArmor 'hp))) (shpGetShieldHP ship))
+				))
+			;Returns a struct with the total adjusted hp for each damage type
+			(setq shpGetTotalHPByType (lambda (ship)
+				(block	(
+							(interiorHP (objGetProperty ship 'interiorHP))
+							result
+							)
+					(objEnumItems ship "asI" theDefense
+						(block	(
+									(adjustedHPByType (itmGetAdjustedHPByType theDefense))
+									)
+							(enum
+								dmgNameList
+								theDamageType
+								(setq result
+									(inc@ result theDamageType
+										(@ adjustedHPByType theDamageType)
+										)
+									)
+								)
+							)
+						)
+					(enum dmgNameList theDamageType (setq result (inc@ result theDamageType interiorHP)))
+					result
+					)
+				))
+			(setq staGetTotalHP (lambda (station)
+				(+ (objGetProperty station 'hp) (objGetProperty station 'structuralHP))
+				))
+			(setq staGetTotalHPByType (lambda (station)
+				(block ((damageMultipliers (itmGetDamageMultiplierByType (typGetDataField (objGetType station) 'armorClass))))
+					(enum (@ damageMultipliers) theKey (set@ damageMultipliers theKey (* (@ damageMultipliers theKey) (staGetTotalHP station))))
+					damageMultipliers
+					)
+				))
+			;Primary weapon damage is "competitive" (i.e. only one primary is used at a time) 
+			(setq shpGetPrimaryDamageByType (lambda (ship)
+				(block	(
+							result
+							)
+					(enum
+						(filter (objGetItems ship "pI") thePrimary (not (itmGetProperty thePrimary 'linkedFireOptions)))
+						thePrimary
+						(block ((damageName (itmGetDamageName thePrimary)))
+							(setq result (set@ result damageName
+								(max
+									(itmGetProperty thePrimary 'damage)
+									(@ result damageName)
+									)
+								))
+							)
+						)
+					result
+					)
+				))
+			;Secondary weapon damage is additive (i.e. all secondary weapons are used together)
+			(setq shpGetNonPrimaryDamageByType (lambda (ship)
+				(block	(
+							(linked (shpGetLinkedDamageByType ship))
+							(launcher (shpGetLauncherDamageByType ship))
+							result
+							)
+					(enum dmgNameList theDamageType
+						(setq result (set@ result theDamageType (+ (@ linked theDamageType) (@ launcher theDamageType))))
+						)
+					)
+				))
+			;Linked damage is additive
+			(setq shpGetLinkedDamageByType (lambda (ship)
+				(block (result)
+					(enum (filter (objGetItems ship "pI") thePrimary (itmGetProperty thePrimary 'linkedFireOptions)) thePrimary
+						(setq result (inc@ result (itmGetDamageName thePrimary) (itmGetProperty thePrimary 'damage)))
+						)
+					result
+					)
+				))
+			;Launcher damage is additive
+			(setq shpGetLauncherDamageByType (lambda (ship)
+				(block (result)
+					(objEnumItems ship "lI" theLauncher
+						(setq result (set@ result (itmGetDamageName theLauncher) (itmGetProperty theLauncher 'damage)))
+						)
+					result
+					)
+				))
+			(setq staGetDamageByType (lambda (station)
+				(block (result)
+					(enum (objGetItems station "wI") theWeapon
+						(setq result (inc@ result (itmGetDamageName theWeapon) (itmGetProperty theWeapon 'damage)))
+						)
+					result
+					)
+				))
+			<!--
+			(setq shpGetMatchup (lambda (ship1 ship2)
+				(block	(
+							(totalHP_ship1 (shpGetTotalHP ship1))
+							(totalHP_ship2 (shpGetTotalHP ship2))
+							(averageDamageMultiplierByType_ship1 (shpGetAverageDamageMultiplierByType ship1))
+							(averageDamageMultiplierByType_ship2 (shpGetAverageDamageMultiplierByType ship2))
+							
+							;Ships can only use one non-linked primary at any time. Therefore, primary weapons compete with each other for the shortest destruction time.
+							(primaryDamageByType_ship1 (shpGetPrimaryDamageByType ship1))
+							(primaryDamageByType_ship2 (shpGetPrimaryDamageByType ship2))
+							
+							
+							(nonPrimaryDamageByType_ship1 (shpGetNonPrimaryDamageByType ship1))
+							(nonPrimaryDamageByType_ship2 (shpGetNonPrimaryDamageByType ship2))
+							
+							
+							adjustedPrimaryDamageByType_ship1
+							adjustedPrimaryDamageByType_ship2
+							
+							;Add all secondary dps values together by adjusting all of them to the other ship's damageAdj
+							adjustedNonPrimaryDamage_ship1
+							adjustedNonPrimaryDamage_ship2
+							
+							;Minimum time to destroy the ship, assuming maximum fire rate and accuracy.
+							minSurvivalTime_ship1
+							minSurvivalTime_ship2
+							)
+					(enum dmgNameList theDamageType
+						(block Nil
+							;Multiply the damage by each type with the enemy's damage multiplier by each type.
+							(set@ adjustedPrimaryDamageByType_ship1 theDamageType
+								(*
+									(@ primaryDamageByType_ship1 theDamageType)
+									(@ averageDamageMultiplierByType_ship2 theDamageType)
+									)
+								)
+							(set@ adjustedPrimaryDamageByType_ship2 theDamageType
+								(*
+									(@ primaryDamageByType_ship2 theDamageType)
+									(@ averageDamageMultiplierByType_ship1 theDamageType)
+									)
+								)
+							;Linked or launcher damage is always additive because linked/launcher weapons do not compete for the quickest destruction time. Instead, their dps values add together
+							(setq adjustedNonPrimaryDamage_ship1 (+ adjustedNonPrimaryDamage_ship1
+								(*
+									(@ nonPrimaryDamageByType_ship1 theDamageType)
+									(@ averageDamageMultiplierByType_ship2 theDamageType)
+									)
+								))
+							(setq adjustedNonPrimaryDamage_ship2 (+ adjustedNonPrimaryDamage_ship2
+								(*
+									(@ nonPrimaryDamageByType_ship2 theDamageType)
+									(@ averageDamageMultiplierByType_ship1 theDamageType)
+									)
+								))
+							)
+						)
+					(setq minSurvivalTime_ship1 (apply2 min
+						(map dmgNameList 'excludeNil theDamageType
+							(block	(
+										(adjustedPrimaryDamage_ship2 (@ adjustedPrimaryDamageByType_ship2 theDamageType))
+										(totalDamage_ship2 (+ adjustedPrimaryDamage_ship2 adjustedNonPrimaryDamage_ship2))
+										)
+								(if (gr totalDamage_ship2 0)
+									(/ totalHP_ship1 totalDamage_ship2)
+									)
+								)
+							)
+						))
+					(setq minSurvivalTime_ship2 (apply2 min
+						(map dmgNameList 'excludeNil theDamageType
+							(block	(
+										(adjustedPrimaryDamage_ship1 (@ adjustedPrimaryDamageByType_ship1 theDamageType))
+										(totalDamage_ship1 (+ adjustedPrimaryDamage_ship1 adjustedNonPrimaryDamage_ship1))
+										)
+								(if (gr totalDamage_ship1 0)
+									(/ totalHP_ship2 totalDamage_ship1)
+									)
+								)
+							)
+						))
+					(switch
+						(not (or minSurvivalTime_ship1 minSurvivalTime_ship2)) ;Both ships are either unarmed or unable to deal damage to each other because they are immune to each other
+							"Definite Stalemate"
+						(not minSurvivalTime_ship1) ;If ship2 cannot deal any damage (either because it is unarmed or because ship2 is immune to ship1's damage types)
+							"Definite Win"
+						(not minSurvivalTime_ship2) ;If ship1 cannot deal any damage (either because it is unarmed or because ship2 is immune to ship2's damage types)
+							"Definite Loss"
+						(/ minSurvivalTime_ship1 minSurvivalTime_ship2)
+						)
+					)
+				))
+			-->
+			(setq shpGetMatchup (lambda (ship1 ship2)
+				(block	(
+							(totalHP_ship1 (shpGetTotalHP ship1))
+							(totalHP_ship2 (shpGetTotalHP ship2))
+							)
+					(shpGetMatchupWithHP ship1 ship2 totalHP_ship1 totalHP_ship2)
+					)
+				))
+			(setq shpGetMatchupMinHP (lambda (ship1 ship2)
+				(block	(
+							(minHP_ship1 (shpGetMinHP ship1))
+							(minHP_ship2 (shpGetMinHP ship2))
+							)
+					(shpGetMatchupWithHP ship1 ship2 minHP_ship1 minHP_ship2)
+					)
+				))
+			(setq shpGetMatchupWithHP (lambda (ship1 ship2 hp_ship1 hp_ship2)
+				(block	(
+							(averageDamageMultiplierByType_ship1 (shpGetAverageDamageMultiplierByType ship1))
+							(averageDamageMultiplierByType_ship2 (shpGetAverageDamageMultiplierByType ship2))
+							
+							;Ships can only use one non-linked primary at any time. Therefore, primary weapons compete with each other for the shortest destruction time.
+							(primaryDamageByType_ship1 (shpGetPrimaryDamageByType ship1))
+							(primaryDamageByType_ship2 (shpGetPrimaryDamageByType ship2))
+							
+							
+							(nonPrimaryDamageByType_ship1 (shpGetNonPrimaryDamageByType ship1))
+							(nonPrimaryDamageByType_ship2 (shpGetNonPrimaryDamageByType ship2))
+							
+							
+							adjustedPrimaryDamageByType_ship1
+							adjustedPrimaryDamageByType_ship2
+							
+							;Add all secondary dps values together by adjusting all of them to the other ship's damageAdj
+							adjustedNonPrimaryDamage_ship1
+							adjustedNonPrimaryDamage_ship2
+							
+							;Minimum time to destroy the ship, assuming maximum fire rate and accuracy.
+							minSurvivalTime_ship1
+							minSurvivalTime_ship2
+							)
+					(enum dmgNameList theDamageType
+						(block Nil
+							;Multiply the damage by each type with the enemy's damage multiplier by each type.
+							(set@ adjustedPrimaryDamageByType_ship1 theDamageType
+								(*
+									(@ primaryDamageByType_ship1 theDamageType)
+									(@ averageDamageMultiplierByType_ship2 theDamageType)
+									)
+								)
+							(set@ adjustedPrimaryDamageByType_ship2 theDamageType
+								(*
+									(@ primaryDamageByType_ship2 theDamageType)
+									(@ averageDamageMultiplierByType_ship1 theDamageType)
+									)
+								)
+							;Linked or launcher damage is always additive because linked/launcher weapons do not compete for the quickest destruction time. Instead, their dps values add together
+							(setq adjustedNonPrimaryDamage_ship1 (+ adjustedNonPrimaryDamage_ship1
+								(*
+									(@ nonPrimaryDamageByType_ship1 theDamageType)
+									(@ averageDamageMultiplierByType_ship2 theDamageType)
+									)
+								))
+							(setq adjustedNonPrimaryDamage_ship2 (+ adjustedNonPrimaryDamage_ship2
+								(*
+									(@ nonPrimaryDamageByType_ship2 theDamageType)
+									(@ averageDamageMultiplierByType_ship1 theDamageType)
+									)
+								))
+							)
+						)
+					(setq minSurvivalTime_ship1 (apply2 min
+						(map dmgNameList 'excludeNil theDamageType
+							(block	(
+										(adjustedPrimaryDamage_ship2 (@ adjustedPrimaryDamageByType_ship2 theDamageType))
+										(totalDamage_ship2 (+ adjustedPrimaryDamage_ship2 adjustedNonPrimaryDamage_ship2))
+										)
+								(if (gr totalDamage_ship2 0)
+									(/ hp_ship1 totalDamage_ship2)
+									)
+								)
+							)
+						))
+					(setq minSurvivalTime_ship2 (apply2 min
+						(map dmgNameList 'excludeNil theDamageType
+							(block	(
+										(adjustedPrimaryDamage_ship1 (@ adjustedPrimaryDamageByType_ship1 theDamageType))
+										(totalDamage_ship1 (+ adjustedPrimaryDamage_ship1 adjustedNonPrimaryDamage_ship1))
+										)
+								(if (gr totalDamage_ship1 0)
+									(/ hp_ship2 totalDamage_ship1)
+									)
+								)
+							)
+						))
+					(switch
+						(not (or minSurvivalTime_ship1 minSurvivalTime_ship2)) ;Both ships are either unarmed or unable to deal damage to each other because they are immune to each other
+							"Definite Stalemate"
+						(not minSurvivalTime_ship1) ;If ship2 cannot deal any damage (either because it is unarmed or because ship2 is immune to ship1's damage types)
+							"Definite Win"
+						(not minSurvivalTime_ship2) ;If ship1 cannot deal any damage (either because it is unarmed or because ship2 is immune to ship2's damage types)
+							"Definite Loss"
+						(/ minSurvivalTime_ship1 minSurvivalTime_ship2)
+						)
+					)
+				))
+			(setq objGetMatchup (lambda (ship1 ship2)
+				(block	(
+							(totalHP_ship1 (shpGetTotalHP ship1))
+							(totalHP_ship2 (shpGetTotalHP ship2))
+							(averageDamageMultiplierByType_ship1 (shpGetAverageDamageMultiplierByType ship1))
+							(averageDamageMultiplierByType_ship2 (shpGetAverageDamageMultiplierByType ship2))
+							
+							;Ships can only use one non-linked primary at any time. Therefore, primary weapons compete with each other for the shortest destruction time.
+							(primaryDamageByType_ship1 (shpGetPrimaryDamageByType ship1))
+							(primaryDamageByType_ship2 (shpGetPrimaryDamageByType ship2))
+							
+							
+							(nonPrimaryDamageByType_ship1 (shpGetNonPrimaryDamageByType ship1))
+							(nonPrimaryDamageByType_ship2 (shpGetNonPrimaryDamageByType ship2))
+							
+							
+							adjustedPrimaryDamageByType_ship1
+							adjustedPrimaryDamageByType_ship2
+							
+							;Add all secondary dps values together by adjusting all of them to the other ship's damageAdj
+							adjustedNonPrimaryDamage_ship1
+							adjustedNonPrimaryDamage_ship2
+							
+							;Minimum time to destroy the ship, assuming maximum fire rate and accuracy.
+							minSurvivalTime_ship1
+							minSurvivalTime_ship2
+							)
+					(enum dmgNameList theDamageType
+						(block Nil
+							;Multiply the damage by each type with the enemy's damage multiplier by each type.
+							(set@ adjustedPrimaryDamageByType_ship1 theDamageType
+								(*
+									(@ primaryDamageByType_ship1 theDamageType)
+									(@ averageDamageMultiplierByType_ship2 theDamageType)
+									)
+								)
+							(set@ adjustedPrimaryDamageByType_ship2 theDamageType
+								(*
+									(@ primaryDamageByType_ship2 theDamageType)
+									(@ averageDamageMultiplierByType_ship1 theDamageType)
+									)
+								)
+							;Linked or launcher damage is always additive because linked/launcher weapons do not compete for the quickest destruction time. Instead, their dps values add together
+							(setq adjustedNonPrimaryDamage_ship1 (+ adjustedNonPrimaryDamage_ship1
+								(*
+									(@ nonPrimaryDamageByType_ship1 theDamageType)
+									(@ averageDamageMultiplierByType_ship2 theDamageType)
+									)
+								))
+							(setq adjustedNonPrimaryDamage_ship2 (+ adjustedNonPrimaryDamage_ship2
+								(*
+									(@ nonPrimaryDamageByType_ship2 theDamageType)
+									(@ averageDamageMultiplierByType_ship1 theDamageType)
+									)
+								))
+							)
+						)
+					(setq minSurvivalTime_ship1 (apply2 min
+						(map dmgNameList 'excludeNil theDamageType
+							(block	(
+										(adjustedPrimaryDamage_ship2 (@ adjustedPrimaryDamageByType_ship2 theDamageType))
+										(totalDamage_ship2 (+ adjustedPrimaryDamage_ship2 adjustedNonPrimaryDamage_ship2))
+										)
+								(if (gr totalDamage_ship2 0)
+									(/ totalHP_ship1 totalDamage_ship2)
+									)
+								)
+							)
+						))
+					(setq minSurvivalTime_ship2 (apply2 min
+						(map dmgNameList 'excludeNil theDamageType
+							(block	(
+										(adjustedPrimaryDamage_ship1 (@ adjustedPrimaryDamageByType_ship1 theDamageType))
+										(totalDamage_ship1 (+ adjustedPrimaryDamage_ship1 adjustedNonPrimaryDamage_ship1))
+										)
+								(if (gr totalDamage_ship1 0)
+									(/ totalHP_ship2 totalDamage_ship1)
+									)
+								)
+							)
+						))
+					(switch
+						(not (or minSurvivalTime_ship1 minSurvivalTime_ship2)) ;Both ships are either unarmed or unable to deal damage to each other because they are immune to each other
+							"Definite Stalemate"
+						(not minSurvivalTime_ship1) ;If ship2 cannot deal any damage (either because it is unarmed or because ship2 is immune to ship1's damage types)
+							"Definite Win"
+						(not minSurvivalTime_ship2) ;If ship1 cannot deal any damage (either because it is unarmed or because ship2 is immune to ship2's damage types)
+							"Definite Loss"
+						(/ minSurvivalTime_ship1 minSurvivalTime_ship2)
+						)
+					)
+				))
+			(setq unvGenerateAllMatchups (lambda Nil
+				(block	(
+							result
+							(ships (map (typFind "s") theClass (sysCreateShip theClass Nil &svPlayer;)))
+							(classCount (count classes))
+							)
+					(enum ships ship1
+						(enum ships ship2
+							(setq result (cat result (subst "%1% VS %2% -&gt; %3%:1\r\n" (objGetName ship1) (objGetName ship2) (shpGetMatchup ship1 ship2))))
+							)
+						)
+					(enum ships theShip
+						(objDestroy theShip)
+						)
+					(printTo 'log result)
+					result
+					)
+				))
+			(setq unvGenerateShipMatchupTable (lambda (standard)
+				(block	(
+							result
+							(theStandard (sysCreateShip standard Nil &svPlayer;))
+							(theStandardName (objGetName theStandard))
+							)
+					(enum (typFind "s") theShipClass
+						(block	(
+									(theShip (sysCreateShip theShipClass Nil &svPlayer;))
+									(theShipName (objGetName theShip))
+									(matchup (shpGetMatchup theShip theStandard))
+									)
+							(setq result (cat result (subst "%1% VS %2% -&gt; %3%:1\r\n" theShipName theStandardName matchup)))
+							)
+						)
+					(printTo 'log result)
+					result
+					)
+				))
+			<!--
+			(setq wpnGetAverageHitsNeeded (lambda (weapon against option)
+				(/
+					(switch
+						(eq option 'object)
+							(shpGetAverageAdjustedHP against (itmGetDamageType weapon))
+						(eq option 'armor)
+							(itmGetAdjustedHP against (itmGetDamageType weapon))
+						)
+					(itmGetProperty weapon 'averageDamage))
+				))
+			(setq wpnGetAverageTimeNeeded (lambda (weapon other option)
+				(* (wpnGetAverageHitsNeeded weapon other option) (itmGetProperty weapon 'fireDelay))
+				))
+			
+			(setq objGetEffectiveness (lambda (obj1 obj2)
+				(block
+					(a1
+						(objGetItems obj1 "aI")
+						)
+					(s1
+						(objGetItems obj1 "sI")
+						)
+					(w1
+						(objGetItems obj1 "wI")
+						)
+						
+					(a2
+						(objGetItems obj1 "aI")
+						)
+					(s2
+						(objGetItems obj2 "sI")
+						)
+					(w2
+						(objGetItems obj2 "wI")
+						)
+						
+					;Map each weapon on one object to its effectiveness
+					(w1_effectiveness
+						(map w1 w (map a2 a (wpnGetAverageTimeNeeded w a 'armor)))
+						)
+					)
+				))
+			-->
+			(setq objGetConsoleName (lambda (obj)
+				(cat (objGetID obj) " [" (objGetName obj) "]")
+				))
+				
+			(setq minIndex (lambda (inputList)
+				(find inputList (apply min inputList))
+				))
+			(setq maxIndex (lambda (inputList)
+				(find inputList (apply max inputList))
+				))
+			
+			<!--
+			Maps a list by a lambda and returns the index of the item with the highest result. For instance, (findMaxByLambda (sysFindObject gSource "sA E P") (lambda (ship) (objGetCombatPower ship))) finds the strongest visible ship.
+			-->
+			(setq findMaxByLambda (lambda (inputList function option)
+				(block
+					(
+						(newList (map inputList input (function input)))
+						(index (find newList (apply max newList)))
+						(result
+							(switch
+								(eq option 'index)
+									index
+									
+								(@ inputList index)
+								)
+							)
+						)
+					result
+					)
+				))
+			(setq findAll (lambda (source target)
+				(block
+					(
+						result
+						)
+					(for i 0 (lnkMaxIndex source)
+						(if (eq (@ source i) target)
+							(lnkAppend result i)
+							)
+						)
+					(reverse result)
+					)
+				))
+			(setq countInstances (lambda (source target)
+				(block	(result)
+					(enum source theItem
+						(if (eq theItem target)
+							(setq result (+ result 1))
+							)
+						)
+					result
+					)
+				))
+			(setq findCount (lambda (source target number)
+				(block	(
+							(result (findAll source target))
+							)
+					(and (gr (count result) number) (subset result 0 number))
+					)
+				))
+			
+			(setq roundDecimal (lambda (input places)
+				(block
+					(
+						(multiplier (10^ places))
+						)
+					(/ (round (* input multiplier)) multiplier)
+					)
+				))
+				
+			;Expanded Notation
+				
+			(setq ordersOfMagnitude (lambda (input)
+				(block
+					(
+						(result 0)
+						)
+					(loop (gr input (10^ result))
+						(setq result (+ result 1))
+						)
+					)
+				))
+				
+			(setq root (lambda (input n)
+				(pow input (/ 1 n))
+				))
+			(setq 10^ (lambda (n)
+				(pow 10 n)
+				))
+			(setq pi 3.14159265)
+			(setq circumference (lambda (radius)
+				(* 2 pi radius)
+				))
+			(setq e 2.71828182845904523536028747135266249775724709369995)
+			(setq ln (lambda (input accuracy)
+				(* accuracy (- (pow input (/ 1 accuracy)) 1))
+				))
+				
+			(setq reverse (lambda (source)
+				(block
+					(
+						(maxIndex (lnkMaxIndex source))
+						result
+						)
+					(for i 0 maxIndex
+						(lnkAppend result (@ source (- maxIndex i)))
+						)
+					result
+					)
+				))
+				
+			(setq andList (lambda (inputList)
+				(apply and inputList)
+				))
+			(setq nandList (lambda (inputList)
+				(not (apply and inputList))
+				))
+			(setq orList (lambda (inputList)
+				(apply or inputList)
+				))
+			(setq norList (lambda (inputList)
+				(not (apply or inputList))
+				))
+			(setq xorList (lambda (inputList)
+				(and (apply or inputList) (not (apply and inputList)))
+				))
+			<!--
+			(setq armGetDamageAdjustment (lambda (armor damage)
+				(if damage
+					(@ (typGetData (itmTypeCheck armor) "adjustment") damage)
+					(typGetData (itmTypeCheck armor) "adjustment")
+					)
+				))
+			-->
+				
+			(setq insert (lambda (input index entry)
+				(append (subset input 0 index) (list entry) (subset input index))
+				))
+			(setq strInsert (lambda (input index entry)
+				(cat (subset input 0 index) entry (subset input index))
+				))
+			(setq rndIndex (lambda (sourceList)
+				(random 0 (- (count sourceList) 1))
+				))
+			(setq randomTable2 (lambda (arguments)
+				(block	(
+							chances
+							total
+							roll
+							index
+							choices
+							result
+							)
+					(for i 0 (- (count arguments) 1)
+						(if (eq (modulo i 2) 0)
+							(lnkAppend chances (@ arguments i))
+							(lnkAppend choices (@ arguments i))
+							)
+						)
+					(setq total (apply add chances))
+					(setq roll (random 1 total))
+					(setq index 0)
+					(enumWhile chances (not result) theChance
+						(if (leq (setq roll (- roll theChance)) 0)
+							(setq result (@ choices index))
+							(setq index (+ index 1))
+							)
+						)
+					result
+					)
+				))
+			
+			;[r|c|e|t|n|o|a|y|d|g]:[0-9]+-[0-9]+;
+			(setq strToDamageDescriptor (lambda (string)
+				(block
+					(
+						;Split the descriptor string into a damage specifier and damage modifiers. Remove the spaces and then split each element into strings for name and number
+						(elements (map (split string ";") theElement (split (strRemove theElement " ") ":")))
+						(damage_specifier_raw (@ elements 0))
+						<!--	"{DAMAGE_TYPE_STRING}:{DICE}d{SIDES}{+/-}{BONUS}"	-->
+						<!--	'([DAMAGE_TYPE_STRING] {DICE}d{SIDES}{+/-}{BONUS})	-->
+						(damage_type (@ damage_specifier_raw 0))
+						(damage_pattern element_number (@ damage_specifier_raw 1))
+						(damage_specifier_final
+							(switch
+								;We have a DICE pattern
+								(find damage_pattern "d")
+									(block
+										(
+											(dice_pattern (split damage_pattern "d"))
+											(dice_count_int (int (@ dice_pattern 0)))
+											(dice_sides_and_bonus_string (@ dice_pattern 1))
+											dice_sides_int
+											dice_bonus_int
+											)
+										(switch
+											;Positive bonus
+											(find dice_sides_and_bonus_string "+")
+												(block
+													(
+														(dice_sides_and_bonus_list (split dice_sides_and_bonus_string "+"))
+														)
+													(setq dice_sides_int (int 			(@ dice_sides_and_bonus 0)))
+													(setq dice_bonus_int (int (cat "+"	(@ dice_sides_and_bonus 1))))
+													)
+											;Negative bonus
+											(find dice_sides_and_bonus_string "-")
+												(block
+													(
+														(dice_sides_and_bonus_list (split dice_sides_and_bonus_string "-"))
+														)
+													(setq dice_sides_int (int			(@ dice_sides_and_bonus_list 0)))
+													(setq dice_bonus_int (int (cat "-"	(@ dice_sides_and_bonus_list 1))))
+													)
+											
+											;No bonus, the string is just the number of sides
+												(block Nil
+													(setq dice_sides_int (int dice_sides_and_bonus_string))
+													(setq dice_bonus_int 0)
+													)
+											)
+										{
+											type: damage_type
+											pattern: 'dice
+											count: dice_count_int
+											sides: dice_sides_int
+											bonus: dice_bonus_int
+											}
+										)
+								;We have a RANGE pattern
+								(find damage_pattern "-")
+									(block
+										(
+											(range_pattern_list (split damage_pattern "-"))
+											(range_lower_int (int (@ range_pattern_list 0)))
+											(range_higher_int (int (@ range_pattern_list 1)))
+											)
+										{
+											type: damage_type
+											pattern: 'range
+											lower: range_lower_int
+											higher: range_higher_int
+											}
+										)
+								;We have a CONSTANT
+								{
+									type: damage_type
+									pattern: 'constant
+									value: (int damage_pattern)
+									}
+								)
+							)
+						)
+					(lnkRemove elements 0) ;Remove the damage specifier (add it back later)
+					;Convert each modifier into a struct
+					(map elements theElement
+						(struct (@ theelement 0) (int (@ theElement 1)))
+						)
+					;Add back the damage specifier as the first element, then merge all the elements into a single struct
+					(apply struct (append (list damage_specifier_final) elements))
+					)
+				))
+			(setq strDice (lambda (dice sides bonus)
+				;If the bonus is greater than zero, add a plus sign because it doesn't have one. If negative, then the sign is already included
+				(cat
+					dice
+					"d"
+					sides
+					(if bonus
+						(cat
+							(if (gr bonus 0)
+								"+"
+								)
+							bonus
+							)
+						)
+					)
+				))
+			(setq shiftUp (lambda (input)
+				(block
+					(
+						;This will also be the last index of the new list
+						(length (count input))
+						
+						(lastIndex (- length 1))
+						(lastItem (@ input lastIndex))
+						(result (append (list lastItem) input))
+						)
+					(lnkRemove result length)
+					)
+				))
+				
+			(setq shiftDown (lambda (input)
+				(block
+					(
+						(firstItem (@ input 0))
+						(result (append input (list firstItem)))
+						)
+					(lnkRemove result 0)
+					)
+				))
+				
+			(setq dmgTypeCheck (lambda (damageType)
+				(if (isInt damageType)
+					damageType
+					(find (list 'laser 'kinetic 'particle 'blast 'ion 'thermo 'positron 'plasma 'antimatter 'nano 'graviton 'singularity 'darkAcid 'darkSteel 'darkLightning 'darkFire) damageType)
+					)
+				))
+			(setq dmgGetTypeName (lambda (damageType)
+				(@ (list 'laser 'kinetic 'particle 'blast 'ion 'thermo 'positron 'plasma 'antimatter 'nano 'graviton 'singularity 'darkAcid 'darkSteel 'darkLightning 'darkFire) damageType)
+				))
+				
+			;Adjust reaction to damage by considering the number of nearby enemies
+			(setq intDamageContext (lambda (object attacker damage)
+				(if (eq (objGetDisposition object attacker) 'friend)
+					(block
+						(
+							(ratio (objGetRecentDispositionDamageRatio attacker))
+							)
+						(if (ls ratio 1)
+							(+ damage (* damage (/ ratio 10)))
+							(* damage ratio)
+							)
+						)
+					)
+				))
+			(setq sysCalcMinRotation (lambda (angle_from angle_to)
+				(block
+					(
+						(CCW (mod 'degrees (- angle_to angle_from) 360))
+						(CW (- 360 CCW))
+						(result
+							(switch
+								(ls CCW CW)
+									(list 'CCW CCW)
+									
+								(ls CW CCW)
+									(list 'CW CW)
+									
+								(eq CW CCW)
+									Nil
+								)
+							)
+						)
+					)
+				))
+				
+			(setq mslCalcTurnDirection (lambda (obj target)
+				(sysCalcMinRotation (sysVectorAngle (objGetVel obj)) (sysVectorAngle target obj))
+				))
+				
+				
+			;S102 Strafer Missile: Strafes instead of turning if the minimum turn is less than 45; Right if CW, left if CCW
+				
+			;Provides attack data about obj_to.
+			;Returns the ratio between damage dealt to friends and damage dealt to enemies (if obj_to is not specified) OR the ratio between damage dealt to an object and damage taken from an obj (if obj_to is specified)
+			;A 1 means that the damage to friends and damage to enemies are 50:50 (if obj_to is not specified) OR the damage received from and damage dealt to an object. Usually, we consider an object's attacks towards friends to be intentional when the friend/enemy damage ratio is greater than one (the object attacks friends more often than enemies)
+			
+			(setq objGetRecentDamageRatio (lambda (obj_from obj_to)
+				<!--	--
+				(block
+					(
+						(ID_from (objGetID obj_from))
+						(ID_to (objGetID obj_to))
+						)
+					(if ID_to
+						(/
+							(+ (typGetTempData &unidDamageTracker; (cat ID_from "_" ID_to "_damage_recent")) 1)
+							(+ (typGetTempData &unidDamageTracker; (cat ID_to "_" ID_from "_damage_recent")) 1)
+							)
+							
+						(/
+							(+ (typGetTempData &unidDamageTracker; (cat ID_from "_friend_damage_recent")) 1)
+							(+ (typGetTempData &unidDamageTracker; (cat ID_from "_enemy_damage_recent")) 1)
+							)
+						)
+					)
+				<!--	-->
+				(block
+					(
+						(ID_from (objGetID obj_from))
+						(ID_to (objGetID obj_to))
+						)
+					(/
+						(+ (objGetRecentDamageByID ID_from ID_to) 1)
+						(+ (objGetRecentDamageByID ID_to ID_from) 1)
+						)
+					)
+				))
+			(setq objGetRecentDispositionDamageRatio (lambda (object)
+				(block
+					(
+						(ID (objGetID object))
+						)
+					(/
+						(+ (objGetRecentDamageByID ID "friend") 1)
+						(+ (objGetRecentDamageByID ID "enemy") 1)
+						)
+					)
+				))
+				
+			(setq objGetRecentFriendDamage (lambda (object)
+				<!--	--
+				(typGetTempData
+					&unidDamageTracker;
+					(cat
+						(objGetID object)
+						"_friend_damage_recent"
+						)
+					)
+				<!--	-->
+				(objGetRecentDamageByID (objGetID object) "friend")
+				<!--	-->
+				))
+			(setq objGetRecentEnemyDamage (lambda (object)
+				<!--	--
+				(typGetTempData
+					&unidDamageTracker;
+					(cat
+						(objGetID object)
+						"_enemy_damage_recent"
+						)
+					)
+				<!--	-->
+				(objGetRecentDamageByID (objGetID object) "enemy")
+				<!--	-->
+				))
+				
+			(setq objGetRecentObjDamage (lambda (obj_from obj_to)
+				<!--	--
+				(typGetTempData
+					&unidDamageTracker;
+					(cat
+						(objGetID obj_from)
+						"_"
+						(objGetID obj_to)
+						"_damage_recent"
+						)
+					)
+				<!--	-->
+				(objGetRecentDamageByID (objGetID obj_from) (objGetID obj_to))
+				<!--	-->
+				))
+			(setq objGetRecentDamageByID (lambda (ID_from ID_to)
+				(typGetTempData &unidDamageTracker; (cat ID_from "_" ID_to "_damage_recent"))
+				))
+			(setq objIncRecentDamageByID (lambda (ID_from ID_to inc)
+				(typIncTempData &unidDamageTracker; (cat ID_from "_" ID_to "_damage_recent") inc 60 0)
+				))
+			(setq extract (lambda (input start end)
+				(block
+					(
+						(index (find input start))
+						(length (subtract (add (find input end) (count end)) index))
+						)
+					(subset input index length)
+					)
+				))
+			<!--
+			(setq strRemove (lambda (target string)
+				(block
+					(
+						(index (find string target))
+						(length (count target))
+						)
+					(cat (subset string (find string target)) (subset string (add index length)))
+					)
+				))
+			-->
+			(setq remove (lambda (source index)
+				(append (subset source 0 index) (subset source (add index 1)))
+				))
+			(setq removeEntry (lambda (source entry)
+				(removeindex source (find source entry))
+				))
+			(setq strRemove (lambda (target string)
+				(apply cat (split target string))
+				))
+			(setq strReplace (lambda (target old new)
+				(block (
+					(parts (split target old))
+					)
+					(for i 0 (- (count parts) 2)
+						(set@ parts i (cat (@ parts i) new))
+						)
+					(apply cat parts)
+					)
+				))
+			<!--
+			(setq itmGetDamageAdjustment (lambda (defense damageType)
+				(block
+					(
+						(type (itmTypeCheck defense))
+						(damage
+							(if (isInt damageType)
+								(find (list 'laser 'kinetic 'particle 'blast 'ion 'thermo 'positron 'plasma 'antimatter 'nano 'graviton 'singularity 'darkAcid 'darkSteel 'darkLightning 'darkFire) damageType)
+								damageType
+								)
+							)
+						(data (@ (typGetData type "adjustment") damage))
+						
+						)
+					(if data
+						data
+						(block
+							(
+								(category (itmGetCategoryLetter type))
+								(xml (typGetXML type))
+								(unid (typDynamicUNID (cat type "adjustment")))
+								(ship (sysCreateShip &scIocrymCommandShip; (sysVectorPolarOffset Nil 0 5000) &svIndependent;))
+								result
+								)
+							(shpRemoveAllDevices ship)
+							(objRemoveAllItems ship)
+							(switch
+								(eq category "s")
+									(block Nil
+										(xmlSetAttrib (xmlGetSubElement type 'Shields) 'hitPoints 10000)
+										(typCreate xml unid)
+										(shpInstallNewDevice ship (itmCreate unid 1))
+										)
+								(eq category "a")
+									(block Nil
+										(xmlSetAttrib (xmlGetSubElement type 'Armor) 'hitPoints 10000)
+										(typCreate xml unid)
+										(shpReplaceAllArmor ship (itmCreate unid 1))
+										(for i 0 15
+											(lnkAppend result (/ (objRepairArmor ship 0 (shpDamageArmor ship 0 i 100)) 100))
+											)
+										)
+								)
+							)
+						)
+					)
+				))
+			-->
+				
+			(setq shpRemoveAllDevices (lambda (ship)
+				(objEnumItems ship "dI" theDevice
+					(shpRemoveDevice ship theDevice)
+					)
+				))
+			(setq objRemoveAllItems (lambda (obj)
+				(objEnumItems obj "*U" theItem
+					(objRemoveItem obj theItem)
+					)
+				))
+			(setq shpReplaceAllArmor (lambda (ship armor)
+				(for i 0 (subtract (shpGetArmorCount ship) 1)
+					(shpInstallNewArmor ship armor i)
+					)
+				))
+				
+			(setq shpInstallNewArmor (lambda (ship itemStruct pos)
+				(block Nil
+					(objAddItem ship itemStruct)
+					(shpInstallArmor ship itemStruct pos)
+					)
+				))
+			(setq shpInstallNewDevice (lambda (ship itemStruct)
+				(block Nil
+					(objAddItem ship itemStruct)
+					(shpInstallDevice ship itemStruct)
+					)
+				))
+				
+			(setq objAddNewItem (lambda (obj type number)
+				(objAddItem obj (itmCreate type (if number number 1)))
+				))
+			(setq objTransferItem (lambda (from to theItem theCount)
+				(block Nil
+					(objRemoveItem from theItem theCount)
+					(objAddItem to theItem theCount)
+					)
+				))
+			(setq itmTypeCheck (lambda (theItem)
+				(if (isInt theItem)
+					theItem
+					(itmGetType theItem)
+					)
+				))
+			
+			(setq forList (lambda (repeats)
+				(block
+					(
+						result
+						)
+					(for i 0 (- repeats 1)
+						(lnkAppend result i)
+						)
+					)
+				))
+			(setq forIndex (lambda (source)
+				(block
+					(
+						result
+						)
+					(for i 0 (- (count source) 1)
+						(lnkAppend result i)
+						)
+					)
+				))
+				
+			(setq findNil (lambda (source)
+				(block
+					(
+						result
+						)
+					(enumWhile (forIndex source) (not index) index
+						(if (@ source index)
+							Nil
+							(setq result index)
+							)
+						)
+					)
+				))
+				
+			(setq containsAll (lambda (source targetList)
+				(eq (count (findAll source targetList)) (count targetList))
+				))
+			<!--
+			(setq findAll (lambda (source targetList)
+				(map targetList target (find source target))
+				))
+			-->
+				
+			(setq typAppendDataEntry (lambda (typ attrib data)
+				(typSetData typ attrib (lnkAppend (typGetData typ attrib) data))
+				))
+			(setq typAppendDataList (lambda (typ attrib data)
+				(typSetData typ attrib (append (typGetData typ attrib) data))
+				))
+				
+			(setq objAppendDataEntry (lambda (obj attrib data)
+				(objSetData obj attrib (lnkAppend (objGetData obj attrib) data))
+				))
+			(setq objAppendDataList (lambda (obj attrib data)
+				(objSetData obj attrib (append (objGetData obj attrib) data))
+				))
+				
+			(setq msnAppendDataEntry (lambda (msn attrib data)
+				(msnSetData msn attrib (lnkAppend (msnGetData msn attrib) data))
+				))
+			(setq msnAppendDataList (lambda (msn attrib data)
+				(msnSetData msn attrib (append (msnGetData msn attrib) data))
+				))
+			<!--
+			;(item1 item2 item2 item3 item3 item3) -> ((item1 1) (item2 2) (item3 3))
+			;Group each entry with the number of times it occurs
+			-->
+			
+			;Don't use keyIndex. It's BROKEN!
+			(setq group (lambda (theList keyIndex)
+				(block (theResultItems theResultCounts theResult theIndex)
+					(enum theList theItem
+						(if (setq theIndex (find
+								theResultItems
+								(if keyIndex
+									(@ theItem keyIndex)
+									theItem
+									)
+								keyIndex
+								)) ;The index of the (item count) entry
+							(inc@ theResultCounts theIndex 1)
+							(block Nil
+								(lnkAppend theResultItems theItem)
+								(lnkAppend theResultCounts 1)
+								)
+							)
+						)
+					(for i 0 (subtract (count theResultItems) 1)
+						(lnkAppend theResult (list (@ theResultItems i) (@ theResultCounts i)))
+						)
+					theResult
+					)
+				))
+			;theOrder is a required argument
+			(setq sortByLambda (lambda (theList theLambda theOrder)
+				;Remove the lambda result from each entry and return the list
+				(map
+					;Sort by lambda result
+					(sort
+						;Append each entry with the result of its lambda
+						(map
+							theList
+							theEntry
+							(list
+								theEntry
+								(theLambda theEntry)
+								)
+							)
+						theOrder
+						1
+						)
+					theEntry
+					(@ theEntry 0)
+					)
+				))
+			<!--
+				INPUT		FORMAT
+				conditions	(list condition1 condition2 condition3	...)
+				results		(list (quote result1) (quote result2)	...)
+			-->
+			(setq switchStack (lambda (conditions results)
+				(block
+					(
+						(met 0)
+						)
+					(loop (@ conditions met)
+						(setq met (add met 1))
+						)
+					(eval (@ results met))
+					)
+				))
+				
+			(setq objGetNearestActive (lambda (center type)
+				(sysFindObject center (cat "Tts A N +unid:" type ";"))
+				))
+				
+			(setq sysFindObjectRefData (lambda (center criteria ref object)
+				(filter (sysFindObject center criteria) theObject (eq (objGetObjRefData theObject ref) object))
+				))
+			(setq sysFindObjectOrder (lambda (center criteria order target)
+				<!--
+				(filter
+					(sysFindObject center criteria)
+					theObject
+					(switch
+						(and order target)
+							(eq (shpGetOrderDesc theObject) (list order target))
+							
+						order
+							(eq (shpGetOrder theObject) order)
+							
+						target
+							(eq (shpGetOrderTarget theObject) target)
+						)
+					)
+				-->
+					
+				(switch
+					(and order target)
+						(filter
+							(sysFindObject center criteria)
+							theObject 
+							(and
+								(eq (shpGetOrder theObject) order)
+								(eq (shpGetOrderTarget theObject) target)
+								)
+							)
+						
+					order
+						(filter (sysFindObject center criteria) theObject (eq (shpGetOrder theObject) order))
+						
+					target
+						(filter (sysFindObject center criteria) theObject (eq (shpGetOrderTarget theObject) target))
+					)
+				))
+				
+			(setq shpGetOrderDescEquals (lambda (object order target)
+				(switch
+					(and order target)
+						(and
+							(eq (shpGetOrder object) order)
+							(eq (shpGetOrderTarget object) target)
+							)
+						
+					order
+						(eq (shpGetOrder object) order)
+						
+					target
+						(eq (shpGetOrderTarget object) target)
+					)
+				))
+			(setq objGetSpeed (lambda (object)
+				(sysVectorSpeed (objGetVel object))
+				))
+				
+			(setq prnEventStart (lambda (event source)
+				(print (cat
+					(if source
+						(cat source ": ")
+						)
+					"&lt;&lt;&lt;"
+					event
+					"&gt;&gt;&gt;"
+					))
+				))
+				
+			(setq prnEventEnd (lambda (event source)
+				(print (cat
+					(if source
+						(cat source ": ")
+						)
+					"&gt;&gt;&gt;"
+					event
+					"&lt;&lt;&lt;"
+					))
+				))
+				
+			(setq prnVariables (lambda (name entryList)
+				(block Nil
+					(prnEventStart name)
+					(enum entryList entry
+						(print (cat (@ entry 0) ": " (@ entry 1)))
+						)
+					(prnEventEnd name)
+					)
+				))
+				
+			(setq intRandomMessage (lambda (length)
+				(block (message)
+					(for i 1 length
+						(setq message (cat message (random '(a b c d e f g h i j k l m n o p q r s t u v w x y z))))
+						)
+					message
+					)
+				))
+				
+			(setq prnAll (lambda (message)
+				(block Nil
+					(printTo 'console message)
+					(printTo 'log message)
+					(objSendMessage gPlayerShip Nil message)
+					(objSendMessage gPlayerShip gPlayerShip message)
+					)
+				))
+				
+			(setq objFireRecurringEvent (lambda (delay object event)
+				(block Nil
+					(objFireEvent object event)
+					(sysAddObjRecurringTimerEvent delay object event)
+					)
+				))
+				
+			(setq itmListToString (lambda (theItems)
+				(block
+					(
+						(itmCount (count theItems))
+						result
+						)
+					(if (eq itmCount 1)
+						(setq result (cat (itmGetName (@ theItems 0) 8)))
+						(block (i)
+							(for i 0 (subtract itmCount 3)
+								(setq result (cat result (itmGetName (@ theItems i) 8) ", "))
+								)
+							(setq result (cat result (itmGetName (@ theItems (subtract (count theItems) 2)) 8) " and "))
+							(setq result (cat result (itmGetName (@ theItems (subtract (count theItems) 1)) 8)))
+							)
+						)
+					result
+					)
+				))
+			(setq objListToString (lambda (objList flags)
+				(block
+					(
+						(objCount (count objList))
+						result
+						)
+					(if (eq objCount 1)
+						(setq result (cat (objGetName (@ objList 0) flags)))
+						(block (i)
+							(for i 0 (- objCount 3)
+								(setq result (cat result (objGetName (@ objList i) flags) ", "))
+								)
+							(setq result (cat result (objGetName (@ objList (- (count objList) 2)) flags) " and "))
+							(setq result (cat result (objGetName (@ objList (- (count objList) 1)) flags)))
+							)
+						)
+					result
+					)
+				))
+			(setq itmGetCategoryLetter (lambda (theItem)
+				(block
+					(
+						(category (itmGetCategory theItem))
+						)
+					(switch
+						(eq category 1)
+							"t"
+						
+						(eq category 2)
+							"a"
+							
+						(eq category 4)
+							"w"
+							
+						(eq category 8)
+							"b"
+							
+						(eq category 16)
+							"l"
+							
+						(eq category 64)
+							"r"
+							
+						(eq category 128)
+							"s"
+							
+						(eq category 256)
+							"c"
+							
+						(eq category 512)
+							"f"
+							
+						(eq category 1024)
+							"m"
+							
+						(eq category 2048)
+							"v"
+							
+						(eq category 4096)
+							"u"
+							
+						Nil
+						)
+					)
+				))
+				
+			;Returns the longest list out of a list of lists. If multiple lists are the same length, returns the first longest list.
+			(setq longest (lambda (lists)
+				(@ lists (longestIndex lists))
+				))
+				
+			;Returns the final index of the longest list in a list of lists
+			(setq longestIndex (lambda (lists)
+				(maxIndex (map lists theList (count theList)))
+				))
+				
+			<!--((1 2 3 4 5) (1 2 3 4 5)) -> ((1 1) (2 2) (3 3) (4 4) (5 5)) -->
+			<!--((1 1) (2 2) (3 3) (4 4) (5 5)) -> ((1 2 3 4 5) (1 2 3 4 5)) -->
+			;Takes multiple lists and separates their entries by index.
+			(setq pair (lambda (lists)
+				(block
+					(
+						(iLength (- (apply max (map lists theList (count theList))) 1))
+						(jLists (- (count lists) 1))
+						(result (forList iLength))
+						)
+					(for i 0 (- iLength 1)
+						(lnkAppend result (map lists theList (@ theList i)))
+						)
+					)
+				))
+				
+			;Takes a table of numbers and returns the index of one of the numbers. A larger number is more likely than a smaller number to have its index returned
+			(setq chanceTable (lambda (frequencyList)
+				(block
+					(
+						(total (sum frequencyList))
+						(roll (random 0 total))
+						result
+						)
+					(enumWhile (forList (count frequencyList)) (not result) theIndex
+						(block
+							(
+								(theItem (@ frequencyList theIndex))
+								)
+							(if (gr roll theItem)
+								(setq roll (- roll theItem))
+								(setq result theIndex)
+								)
+							)
+						)
+					)
+				))
+			(setq sum (lambda (numberList)
+				(apply + numberList)
+				))
+			
+			(setq average (lambda (numberList)
+				(/ (sum numberList) (count numberList))
+				))
+			(setq range (lambda (input minimum maximum)
+				(switch
+					(ls input minimum)
+						minimum
+						
+					(gr input maximum)
+						maximum
+						
+					input
+					)
+				))
+			<!--	--
+			(setq objSetCurrentTempData (lambda (object data value lifetime change)
+				(block
+					(
+						(overlay
+							(match
+								(objGetOverlays object)
+								theOverlay
+								(and (eq (objGetOverlayType object theOverlay) &ovTempData;) (objGetOverlayData object theOverlay data))
+								)
+							)
+						)
+					(if overlay
+						(objRemoveOverlay object overlay)
+						)
+					(objSetOverlayData object (objAddOverlay object &ovTempData; lifetime) data value)
+					)
+				))
+				
+			(setq objSetNewTempData (lambda (object data value lifetime change)
+				(block
+					(
+						(overlay
+							(match
+								(objGetOverlays object)
+								theOverlay
+								(and (eq (objGetOverlayType object theOverlay) &ovTempData;) (objGetOverlayData object theOverlay data))
+								)
+							)
+						)
+					(if overlay
+						(objRemoveOverlay object overlay)
+						)
+					(setq overlay (objAddOverlay object &ovTempData; lifetime))
+					(objSetOverlayData object overlay data value)
+					(objSetOverlayData object overlay "change" change)
+					)
+				))
+				
+			(setq objIncNewTempData (lambda (object data inc lifetime decay)
+				(block
+					(
+						(overlay
+							(match
+								(objGetOverlays object)
+								theOverlay
+								(and (eq (objGetOverlayType object theOverlay) &ovTempData;) (objGetOverlayData object theOverlay data))
+								)
+							)
+						value
+						)
+					(if overlay
+						(block Nil
+							(setq value (add (objGetOverlayData object overlay data) inc))
+							(objRemoveOverlay object overlay)
+							)
+						(setq value inc)
+						)
+					(setq overlay (objAddOverlay object &ovTempData; lifetime))
+					(objSetOverlayData object overlay data value)
+					(objSetOverlayData object overlay "change" change)
+					)
+				))
+			<!--	-->
+			
+			(setq objGetTempData (lambda (object attribute)
+				(unvGetTempData (cat "Object" (objGetID object) attribute))
+				))
+			(setq objGetTempDataEntry (lambda (object attribute)
+				(unvGetTempDataEntry (cat "Object" (objGetID object) attribute))
+				))
+			(setq objSetTempData (lambda (object attribute value lifetime change)
+				(unvSetTempData (cat "Object" (objGetID object) attribute) value lifetime change)
+				))
+			(setq objIncTempData (lambda (object attribute value lifetime change)
+				(unvIncTempData (cat "Object" (objGetID object) attribute) value lifetime change)
+				))
+				
+			(setq typGetTempData (lambda (type attribute)
+				(unvGetTempData (cat "Type" type attribute))
+				))
+			(setq typGetTempDataEntry (lambda (type attribute)
+				(unvGetTempDataEntry (cat "Type" type attribute))
+				))
+			(setq typSetTempData (lambda (type attribute value lifetime change)
+				(unvSetTempData (cat "Type" type attribute) value lifetime change)
+				))
+			(setq typIncTempData (lambda (type attribute value lifetime change)
+				(unvIncTempData (cat "Type" type attribute) value lifetime change)
+				))
+			<!-- OLD FRAMEWORK
+			(setq unvSetTempData (lambda (signature value lifetime change)
+				(block
+					(
+						(data
+							(typGetData &unidTempData; 'data)
+							)
+						(index
+							(find
+								data
+								signature
+								0
+								)
+							)
+						)
+					(if index
+						(set@ data index (list signature value lifetime change))
+						(lnkAppend data (list signature value lifetime change))
+						)
+					(typSetData &unidTempData; 'data data)
+					)
+				))
+			(setq unvIncTempData (lambda (signature value lifetime change)
+				(block
+					(
+						(data
+							(typGetData &unidTempData; 'data)
+							)
+						(index
+							(find
+								data
+								signature
+								0
+								)
+							)
+						(entry
+							(@
+								data
+								index
+								)
+							)
+						)
+					(if index
+						(set@ data index (list signature (add value (@ entry 1)) lifetime change))
+						(lnkAppend data (list signature value lifetime change))
+						)
+					(typSetData &unidTempData; 'data data)
+					)
+				))
+			(setq unvGetTempData (lambda (signature)
+				(@ (unvGetTempDataEntry signature) 1)
+				))
+			(setq unvGetTempDataEntry (lambda (signature)
+				<!--
+				(block
+					(
+						(data
+							(typGetData &unidTempData; 'data)
+							)
+						(entry
+							(lookup
+								data
+								signature
+								0
+								)
+							)
+						)
+					entry
+					)
+				--
+				(lookup (typGetData &unidTempData; 'data) signature 0)
+				))
+
+				
+			(setq unvSetTempDataEntry (lambda (entry)
+				(block
+					(
+						(data
+							(typGetData &unidTempData; 'data)
+							)
+						(index
+							(find
+								data
+								(@ entry 0)
+								)
+							)
+						)
+					(if index
+						(set@ data index entry)
+						(lnkAppend data entry)
+						)
+					(typSetData &unidTempData; 'data data)
+					)
+				))
+				
+			(setq unvRemoveTempDataEntry (lambda (entry)
+				(block
+					(
+						(data (typGetData &unidTempData; 'data))
+						(index (find data entry))
+						)
+					(lnkRemove data index)
+					(typSetData &unidTempData; 'data data)
+					)
+				))
+			-->
+			
+			(setq unvSetTempData (lambda (signature value lifetime change)
+				(block
+					(
+						(data
+							(typGetData &unidTempData; 'data)
+							)
+						)
+					(set@ data signature
+						{
+							signature: signature
+							value: value
+							lifetime: lifetime
+							change: change
+							}
+						)
+					(typSetData &unidTempData; 'data data)
+					)
+				))
+			(setq unvIncTempData (lambda (signature value lifetime change)
+				(block
+					(
+						(data
+							(typGetData &unidTempData; 'data)
+							)
+						(entry
+							(@
+								data
+								signature
+								)
+							)
+						)
+					(set@ data signature
+						{
+							signature: signature
+							value: (add value (@ entry 'value))
+							lifetime: lifetime
+							change: change
+							}
+						)
+					(typSetData &unidTempData; 'data data)
+					)
+				))
+			(setq unvGetTempData (lambda (signature)
+				(@ (unvGetTempDataEntry signature) 'value)
+				))
+			(setq unvGetTempDataEntry (lambda (signature)
+				<!--
+				(block
+					(
+						(data
+							(typGetData &unidTempData; 'data)
+							)
+						(entry
+							(lookup
+								data
+								signature
+								0
+								)
+							)
+						)
+					entry
+					)
+				-->
+				(@ (typGetData &unidTempData; 'data) signature)
+				))
+
+				
+			(setq unvSetTempDataEntry (lambda (entry)
+				(block
+					(
+						(data
+							(typGetData &unidTempData; 'data)
+							)
+						(signature (@ entry 'signature))
+						)
+					(set@ data signature entry)
+					(typSetData &unidTempData; 'data data)
+					)
+				))
+				
+			(setq unvRemoveTempDataEntry (lambda (entry)
+				(block
+					(
+						(data (typGetData &unidTempData; 'data))
+						(signature (@ entry 'signature))
+						)
+					(set@ data signature Nil)
+					(typSetData &unidTempData; 'data data)
+					)
+				))
+				
+				
+			(setq xmlFindSubElement (lambda (xml target)
+				(block
+					(
+						(i 0)
+						index
+						)
+					(enumWhile (xmlGetSubElementList xml) (not index) theSubElement
+						(if (find theSubElement target)
+							(setq index i)
+							(setq i (add i 1))
+							)
+						)
+					)
+				))
+			(setq xmlRandomizeAttrib (lambda (xml attrib sources)
+				(block
+					(
+						(repeats 0)
+						(new (xmlGetAttrib (random sources) attrib))
+						)
+					(loop (and (not new) (ls repeats 10))
+						(setq new (xmlGetAttrib (random sources) attrib))
+						)
+					(if new
+						(xmlSetAttrib xml attrib new)
+						)
+					)
+				))
+			;Converts XML into a struct and back.
+			<!--
+			Struct format
+			'tag			The tag of the element
+			'attributes		A struct containing all the attributes of the element
+			'subelements	A list of structs for the subelements, formatted in the same way
+			-->
+			(setq xmlFromStruct (lambda (theStruct)
+				(block	(
+							(result (xmlCreate (cat "&lt;" (@ theStruct 'tag) "/&gt;")))
+							(attributes (@ theStruct 'attributes))
+							(subelements (@ theStruct 'subelements))
+							)
+					(enum (@ attributes) theKey
+						(xmlSetAttrib result 'theKey (@ attributes theKey))
+						)
+					(enum subelements theSubElement
+						(xmlAppendSubElement result (xmlFromStruct theSubElement))
+						)
+					result
+					)
+				))
+			(setq xmlToStruct (lambda (theXML)
+				(if theXML
+					(block	(
+								(result
+									{
+										tag: (xmlGetTag theXML)
+										attributes: {}
+										}
+									)
+								;Struct containing all attributes as its keys
+								(attributes Nil)
+								;A list of subelement structs
+								(subelements Nil)
+								)
+						;Copy all attributes to the struct
+						(enum (xmlGetAttribList theXML) theAttrib
+							(set@ attributes theAttrib (xmlGetAttrib theXML theAttrib))
+							)
+						;Convert all subelements
+						(enum (xmlGetSubElementList theXML) theSubElement
+							(lnkAppend subelements (xmlToStruct theSubElement))
+							)
+						;Add the attributes and subelements
+						(set@ result 'attributes attributes)
+						(set@ result 'subelements subelements)
+						result
+						)
+					(print "xmlToStruct used on Nil")
+					)
+				))
+			(setq findClosest (lambda (source target)
+				(block
+					(
+						result_index
+						(result_distance 1000000)
+						)
+					(enumWhile (forList (count source)) (not result) entry_index
+						(block
+							(
+								(entry_distance (abs (subtract target (@ source entry_index))))
+								)
+							(if (ls entry_distance result_distance)
+								(setq result_index entry_index)
+								)
+							)
+						)
+					result_index
+					)
+				))
+				
+			(setq filterDuplicates (lambda (source)
+				(block (seen)
+					(enum source entry
+						(if (find seen entry)
+							Nil
+							(lnkAppend seen entry)
+							)
+						)
+					seen
+					)
+				))
+			(setq lnkRemoveDuplicates (lambda (source)
+				(block
+					(
+						seen
+						entry
+						(index 0)
+						)
+					(for i 0 (lnkMaxIndex source)
+						(if (find seen (setq entry (@ source index)))
+							(lnkRemove source index)
+							(block Nil
+								(lnkAppend seen entry)
+								(setq index (+ index 1))
+								)
+							)
+						)
+					source
+					)
+				))
+				
+			(setq lnkRemoveMultiple (lambda (source indexList)
+				(block
+					(
+						(removedCount 0)
+						)
+					(enum indexList theIndex
+						(block Nil
+							(lnkRemove source (- theIndex removedCount))
+							(setq removedCount (+ removedCount 1))
+							)
+						)
+					)
+				))
+			(setq lnkRemoveItemMultiple (lambda (source targetList)
+				(enum targetList target
+					(lnkRemove source (find source target))
+					)
+				))
+			(setq findMultiple (lambda (source target keyIndex)
+				(block
+					(
+						nextFoundIndex
+						)
+					(loop (setq nextFoundIndex (find source target keyIndex))
+						(setq source (subset source (+ nextFoundIndex 1)))
+						)
+					)
+				))
+			;Takes a list, removes a random item, and returns that item
+			(setq pick (lambda (source)
+				(lnkTake source (random 0 (lnkMaxIndex source)))
+				))
+			;Randomly select a number of items from a list
+			(setq select (lambda (source number)
+				(block
+					(
+						(choices source)
+						result
+						)
+					(for i 1 number
+						(lnkAppend result (lnkTake choices (random 0 (lnkMaxIndex choices))))
+						)
+					)
+				))
+				
+			;Start from 0 and end at 359
+			(setq sinTable (list
+				0.0
+				0.01745240643728351
+				0.03489949670250097
+				0.05233595624294383
+				0.0697564737441253
+				0.08715574274765817
+				0.10452846326765346
+				0.12186934340514748
+				0.13917310096006544
+				0.15643446504023087
+				0.17364817766693033
+				0.1908089953765448
+				0.20791169081775931
+				0.224951054343865
+				0.24192189559966773
+				0.25881904510252074
+				0.27563735581699916
+				0.29237170472273677
+				0.3090169943749474
+				0.32556815445715664
+				0.3420201433256687
+				0.35836794954530027
+				0.374606593415912
+				0.3907311284892737
+				0.40673664307580015
+				0.42261826174069944
+				0.4383711467890774
+				0.45399049973954675
+				0.4694715627858908
+				0.48480962024633706
+				0.49999999999999994
+				0.5150380749100542
+				0.5299192642332049
+				0.5446390350150271
+				0.5591929034707469
+				0.573576436351046
+				0.5877852522924731
+				0.6018150231520483
+				0.6156614753256582
+				0.6293203910498374
+				0.6427876096865393
+				0.6560590289905072
+				0.6691306063588582
+				0.6819983600624985
+				0.6946583704589973
+				0.7071067811865475
+				0.7193398003386511
+				0.7313537016191705
+				0.7431448254773942
+				0.754709580222772
+				0.766044443118978
+				0.7771459614569708
+				0.788010753606722
+				0.7986355100472928
+				0.8090169943749475
+				0.8191520442889918
+				0.8290375725550417
+				0.8386705679454239
+				0.8480480961564261
+				0.8571673007021122
+				0.8660254037844386
+				0.8746197071393957
+				0.8829475928589269
+				0.8910065241883678
+				0.898794046299167
+				0.9063077870366499
+				0.9135454576426009
+				0.9205048534524403
+				0.9271838545667874
+				0.9335804264972017
+				0.9396926207859083
+				0.9455185755993167
+				0.9510565162951535
+				0.9563047559630354
+				0.9612616959383189
+				0.9659258262890683
+				0.9702957262759965
+				0.9743700647852352
+				0.9781476007338056
+				0.981627183447664
+				0.984807753012208
+				0.9876883405951378
+				0.9902680687415703
+				0.992546151641322
+				0.9945218953682733
+				0.9961946980917455
+				0.9975640502598242
+				0.9986295347545738
+				0.9993908270190958
+				0.9998476951563913
+				1.0
+				0.9998476951563913
+				0.9993908270190958
+				0.9986295347545738
+				0.9975640502598242
+				0.9961946980917455
+				0.9945218953682734
+				0.9925461516413221
+				0.9902680687415704
+				0.9876883405951377
+				0.984807753012208
+				0.981627183447664
+				0.9781476007338057
+				0.9743700647852352
+				0.9702957262759965
+				0.9659258262890683
+				0.9612616959383189
+				0.9563047559630355
+				0.9510565162951536
+				0.9455185755993168
+				0.9396926207859084
+				0.9335804264972017
+				0.9271838545667874
+				0.9205048534524404
+				0.913545457642601
+				0.90630778703665
+				0.8987940462991669
+				0.8910065241883679
+				0.8829475928589271
+				0.8746197071393959
+				0.8660254037844387
+				0.8571673007021123
+				0.8480480961564261
+				0.838670567945424
+				0.8290375725550417
+				0.819152044288992
+				0.8090169943749475
+				0.7986355100472927
+				0.788010753606722
+				0.777145961456971
+				0.766044443118978
+				0.7547095802227718
+				0.7431448254773942
+				0.7313537016191706
+				0.7193398003386514
+				0.7071067811865476
+				0.6946583704589971
+				0.6819983600624986
+				0.6691306063588583
+				0.6560590289905073
+				0.6427876096865395
+				0.6293203910498377
+				0.6156614753256584
+				0.6018150231520482
+				0.5877852522924732
+				0.5735764363510464
+				0.5591929034707469
+				0.5446390350150269
+				0.5299192642332049
+				0.5150380749100544
+				0.49999999999999994
+				0.48480962024633717
+				0.4694715627858911
+				0.45399049973954686
+				0.4383711467890773
+				0.4226182617406995
+				0.40673664307580043
+				0.39073112848927416
+				0.37460659341591224
+				0.3583679495453002
+				0.3420201433256689
+				0.325568154457157
+				0.3090169943749475
+				0.29237170472273705
+				0.27563735581699966
+				0.258819045102521
+				0.24192189559966773
+				0.22495105434386478
+				0.20791169081775931
+				0.19080899537654497
+				0.17364817766693028
+				0.15643446504023098
+				0.13917310096006574
+				0.12186934340514755
+				0.10452846326765373
+				0.08715574274765864
+				0.06975647374412552
+				0.05233595624294381
+				0.0348994967025007
+				0.01745240643728344
+				1.2246467991473532E-16
+				-0.017452406437283192
+				-0.0348994967025009
+				-0.052335956242943564
+				-0.06975647374412483
+				-0.08715574274765794
+				-0.10452846326765305
+				-0.12186934340514775
+				-0.13917310096006552
+				-0.15643446504023073
+				-0.17364817766693047
+				-0.19080899537654472
+				-0.20791169081775907
+				-0.22495105434386498
+				-0.2419218955996675
+				-0.25881904510252035
+				-0.275637355816999
+				-0.2923717047227364
+				-0.30901699437494773
+				-0.32556815445715676
+				-0.34202014332566866
+				-0.35836794954530043
+				-0.374606593415912
+				-0.39073112848927355
+				-0.4067366430757998
+				-0.4226182617406993
+				-0.43837114678907707
+				-0.45399049973954625
+				-0.46947156278589086
+				-0.48480962024633695
+				-0.5000000000000001
+				-0.5150380749100542
+				-0.5299192642332048
+				-0.5446390350150271
+				-0.5591929034707467
+				-0.5735764363510458
+				-0.587785252292473
+				-0.601815023152048
+				-0.6156614753256578
+				-0.6293203910498376
+				-0.6427876096865393
+				-0.6560590289905074
+				-0.6691306063588582
+				-0.6819983600624984
+				-0.6946583704589974
+				-0.7071067811865475
+				-0.7193398003386509
+				-0.7313537016191701
+				-0.743144825477394
+				-0.7547095802227717
+				-0.7660444431189779
+				-0.7771459614569711
+				-0.7880107536067221
+				-0.7986355100472928
+				-0.8090169943749473
+				-0.8191520442889916
+				-0.8290375725550414
+				-0.838670567945424
+				-0.848048096156426
+				-0.8571673007021121
+				-0.8660254037844385
+				-0.8746197071393959
+				-0.882947592858927
+				-0.8910065241883678
+				-0.8987940462991668
+				-0.9063077870366497
+				-0.913545457642601
+				-0.9205048534524403
+				-0.9271838545667873
+				-0.9335804264972016
+				-0.9396926207859082
+				-0.9455185755993168
+				-0.9510565162951535
+				-0.9563047559630353
+				-0.9612616959383189
+				-0.9659258262890683
+				-0.9702957262759965
+				-0.9743700647852351
+				-0.9781476007338056
+				-0.9816271834476639
+				-0.984807753012208
+				-0.9876883405951377
+				-0.9902680687415704
+				-0.9925461516413221
+				-0.9945218953682734
+				-0.9961946980917455
+				-0.9975640502598242
+				-0.9986295347545738
+				-0.9993908270190957
+				-0.9998476951563913
+				-1.0
+				-0.9998476951563913
+				-0.9993908270190958
+				-0.9986295347545738
+				-0.9975640502598243
+				-0.9961946980917455
+				-0.9945218953682734
+				-0.992546151641322
+				-0.9902680687415704
+				-0.9876883405951378
+				-0.9848077530122081
+				-0.9816271834476641
+				-0.9781476007338058
+				-0.9743700647852352
+				-0.9702957262759966
+				-0.9659258262890682
+				-0.9612616959383188
+				-0.9563047559630354
+				-0.9510565162951536
+				-0.945518575599317
+				-0.9396926207859085
+				-0.9335804264972021
+				-0.9271838545667874
+				-0.9205048534524405
+				-0.9135454576426008
+				-0.9063077870366498
+				-0.898794046299167
+				-0.891006524188368
+				-0.8829475928589271
+				-0.8746197071393961
+				-0.8660254037844386
+				-0.8571673007021123
+				-0.8480480961564261
+				-0.8386705679454243
+				-0.8290375725550421
+				-0.8191520442889918
+				-0.8090169943749476
+				-0.798635510047293
+				-0.7880107536067218
+				-0.7771459614569708
+				-0.7660444431189781
+				-0.7547095802227721
+				-0.7431448254773946
+				-0.731353701619171
+				-0.7193398003386517
+				-0.7071067811865477
+				-0.6946583704589976
+				-0.6819983600624983
+				-0.6691306063588581
+				-0.6560590289905074
+				-0.6427876096865396
+				-0.6293203910498378
+				-0.6156614753256588
+				-0.6018150231520483
+				-0.5877852522924734
+				-0.5735764363510465
+				-0.5591929034707473
+				-0.544639035015027
+				-0.5299192642332058
+				-0.5150380749100545
+				-0.5000000000000004
+				-0.4848096202463369
+				-0.4694715627858908
+				-0.45399049973954697
+				-0.438371146789077
+				-0.4226182617407
+				-0.40673664307580015
+				-0.3907311284892747
+				-0.37460659341591235
+				-0.35836794954530077
+				-0.3420201433256686
+				-0.32556815445715753
+				-0.3090169943749476
+				-0.29237170472273627
+				-0.2756373558169998
+				-0.2588190451025207
+				-0.24192189559966787
+				-0.22495105434386534
+				-0.20791169081775987
+				-0.19080899537654467
+				-0.17364817766693127
+				-0.15643446504023112
+				-0.13917310096006588
+				-0.12186934340514811
+				-0.10452846326765342
+				-0.08715574274765832
+				-0.06975647374412476
+				-0.05233595624294437
+				-0.034899496702500823
+				-0.01745240643728445
+				))
+			(setq sin (lambda (angle)
+				;(@ sinTable (modNegative angle 360))
+				(@ sinTable (mod 'degrees angle 360))
+				))
+			(setq cos (lambda (angle)
+				;(@ sinTable (modNegative (- 90 angle) 360))
+				(@ sinTable (mod 'degrees (- 90 angle) 360))
+				))
+			)
+	</Globals>
+	
+</TranscendenceLibrary>

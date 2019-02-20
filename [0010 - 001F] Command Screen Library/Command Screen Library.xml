@@ -1,0 +1,2761 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!DOCTYPE TranscendenceExtension
+[
+	
+	<!ENTITY unidEdgeGlobals				"0xA0130000">
+	
+	<!--	CUSTOM	ENTITIES	-->
+	<!ENTITY unidCommandScreenLibrary		"0xA0130010">
+	<!ENTITY dsCommandScreen				"0xA0130011">
+	<!ENTITY dsManageObjects				"0xA0130012">
+	<!ENTITY dsExamineObject				"0xA0130013">
+	<!ENTITY dsManageItems					"0xA0130014">
+	<!ENTITY dsReplaceArmor					"0xA0130015">
+	<!ENTITY dsOrderSubordinates			"0xA0130016">
+	<!ENTITY dsViewDockedShips				"0xA0130017">
+	<!ENTITY dsCommandScreenManual			"0xA0130018">
+]>
+<TranscendenceLibrary UNID="&unidCommandScreenLibrary;" name="Command Screen Library 0.8" apiVersion="35" version="1.0" credits="0xABCDEF (Game &amp; Forum) / Archcannon (IRC &amp; Xelerus)">
+
+	<Library UNID="&unidEdgeGlobals;"/>
+	<Library UNID="&unidRPGLibrary;"/>
+	
+	<!--GLOBAL VARIABLES
+			General
+				cmsSubordinateCriteria	Determines whether a ship is a subordinate or not
+			&dsCommandScreen;
+				gData
+					'custom						Determines whether the screen automatically sets default parameters at initialization
+				cmsRange					The maximum distance of an object for it to appear on the screen. Defaults to 2000.
+				cmsScaleDistance			The distance in light seconds represented by one pixel. Defaults to 4.
+				cmsScaleShip				The ratio between the ship image's size and its representation on the screen. Defaults to 16.
+				cmsScaleStation			The ratio between the station image's size and its representation on the screen. Defaults to 16.
+				cmsCursorX				X coordinate of the center of the cursor. Defaults to 300.
+				cmsCursorY				Y coordinate of the center of the cursor. Defaults to 200.
+				cmsCursorWidth			The width of the cursor. Defaults to 1.
+				cmsCursorHeight			The height of the cursor. Defaults to 1.
+				cmsXCursorNW				X coordinate of the North-West corner of the cursor
+				cmsYCursorNW				Y coordinate of the North-West corner of the cursor
+				cmsXCursorNE				X coordinate of the North-East corner of the cursor
+				cmsYCursorNE				Y coordinate of the North-East corner of the cursor
+				cmsXCursorSE				X coordinate of the South-East corner of the cursor
+				cmsYCursorSE				Y coordinate of the South-East corner of the cursor
+				cmsXCursorSW				X coordinate of the South-West corner of the cursor
+				cmsYCursorSW				Y coordinate of the South-West corner of the cursor
+				cmsCursorSpeed			The rate at which the cursor moves/resizes and the screen pans. Defaults to 4.
+				cmsCenterX				X coordinate of the crosshair on the screen. Always 300.
+				cmsCenterY				Y coordinate of the crosshair on the screen. Always 200.
+				cmsOriginX				X coordinate of the user on the screen. Defaults to 300.
+				cmsOriginY				Y coordinate of the user on the screen. Defaults to 200.
+				cmsOriginPos				Actual vector location of the user
+				cmsShow					Determines whether to show the cursor and screen controls. Defaults to True.
+				
+				cmsShipList				List of entries for ships that appear on the screen
+				cmsStationList			List of entries for stations that appear on the screen
+				cmsSelectedList			List of selected objects. Always appear at the top of the examine list
+				cmsExamineList			List of objects under the cursor.
+				cmsMapCriteria			Criteria for objects to appear on the screen
+			&dsManageObjects;			Provides functions for objects under the cursor.
+				cmsExamineList			List of objects that were under the cursor in &dsCommandScreen;
+			&dsExamineObject;			Provides functions for a single object
+				cmsExamineObject			The object whose information appears on the screen. Chosen by &dsManageObjects;
+			&dsOrderSubordinates;		Allows user to assign orders to subordinates, using the examined object as the target
+				cmsShipListNameFilter		Used to filter subordinates based on name
+				cmsExamineObject			The object to be targeted by subordinate orders. Chosen by &dsManageObjects;
+				cmsImmediate				Determines whether subordinate orders are applied immediately.
+				cmsOrderSelected			Determines whether subordinate orders apply to all selected subordinates or only the one under the cursor.
+				cmsList		
+			scnSetDefaults				Sets default values to all global variables
+			scnInitializeObjects		Initializes cmsShipList and cmsStationList
+	-->
+	<DockScreen UNID="&dsCommandScreen;"
+			name=				"Command Screen"
+			backgroundID=		"none"
+			>
+		<OnScreenInit>
+			(block ()
+				(if (not (@ gData 'custom))
+					(scnSetDefaults)
+					)
+				;(sysStopTime 999999 (random (sysFindObject gSource "G")))
+				)
+		</OnScreenInit>
+			
+		<Display>
+			<Canvas>
+				(scnDraw)
+			</Canvas>
+		</Display>
+		<Panes>
+			<Default>
+				<OnPaneInit>
+					(block
+						(
+							desc
+							)
+						(scnInitializeObjects)
+						<!--
+						;Draw cursor as a hollow rectangle
+						(setq cmsXCursorNW (- cmsCursorX cmsCursorWidth))
+						(setq cmsYCursorNW (- cmsCursorY cmsCursorHeight))
+						
+						(setq cmsXCursorNE (+ cmsCursorX cmsCursorWidth))
+						(setq cmsYCursorNE (- cmsCursorY cmsCursorHeight))
+						
+						(setq cmsXCursorSW (- cmsCursorX cmsCursorWidth))
+						(setq cmsYCursorSW (+ cmsCursorY cmsCursorHeight))
+
+						(setq cmsXCursorSE (+ cmsCursorX cmsCursorWidth))
+						(setq cmsYCursorSE (+ cmsCursorY cmsCursorHeight))
+						-->
+						
+						<!--
+						(setq cmsShow (scrGetData gScreen "show"))
+						
+						(scrEnableAction gScreen 'actionShow (not cmsShow))
+						(scrEnableAction gScreen 'actionHide cmsShow)
+						
+						(scrEnableAction gScreen 'actionCursorUp cmsShow)
+						(scrEnableAction gScreen 'actionCursorDown cmsShow)
+						(scrEnableAction gScreen 'actionCursorRight cmsShow)
+						(scrEnableAction gScreen 'actionCursorLeft cmsShow)
+						
+						(scrEnableAction gScreen 'actionHeightUp cmsShow)
+						(scrEnableAction gScreen 'actionHeightDown cmsShow)
+						
+						(scrEnableAction gScreen 'actionWidthUp cmsShow)
+						(scrEnableAction gScreen 'actionWidthDown cmsShow)
+						-->
+						(setq cmsExamineList cmsSelectedList) ;Selected objects always appear first in the examine list
+						;If any object has its center within the NW and SE corners, include it in the pane description
+						(enum (append cmsShipList cmsStationList cmsMarkerList) objectDesc
+							(block (xCenter yCenter object)
+								(setq xCenter (@ objectDesc 'xPosCenter))
+								(setq yCenter (@ objectDesc 'yPosCenter))
+								(setq object (@ objectDesc 'object))
+								(if
+									(and
+										(leq xCenter cmsXCursorSE) ;To the left of the SE Corner
+										(leq yCenter cmsYCursorSE) ;Above the SE Corner
+										(geq xCenter cmsXCursorNW) ;To the right of the NW Corner
+										(geq yCenter cmsYCursorNW) ;Below the NW Corner
+										)
+										
+									(lnkAppend cmsExamineList object)
+									)
+								)
+							)
+						(if cmsExamineList
+							(block
+								(
+									(objectCount (count cmsExamineList))
+									(selectedIndex (count cmsSelectedList))
+									hidden
+									)
+								(if (eq objectCount 1)
+									(setq desc (cat objectCount " object under the cursor:\n"))
+									(setq desc (cat objectCount " objects under the cursor:\n"))
+									)
+								(for i 0 (min (- objectCount 1) 5)
+									(setq
+										desc
+										(cat
+											desc
+											(+ i 1)
+											". "
+											(objGetName (@ cmsExamineList i) 0x04)
+											(if (ls i selectedIndex)
+												" (Selected)"
+												)
+											"\n"
+											)
+										)
+									)
+								
+								(setq hidden (- objectCount 6))
+								(if (gr hidden 0)
+									(setq desc (cat desc hidden " other objects not listed."))
+									)
+								(scrEnableAction gScreen 'actionExamine True)
+								)
+							(block Nil
+								(setq desc "No objects under cursor.")
+								(scrEnableAction gScreen 'actionExamine Nil)
+								)
+							)
+						(scrSetDesc gScreen desc)
+						(if cmsShow
+							(block Nil
+								(scrSetActionLabel gScreen 'actionControls "Q - Lock Cursor" "Q")
+								(enum (list 'actionManual 'actionMarkerCreate 'actionViewDockedShips 'actionSubordinates) theActionID
+									(scrRemoveAction gScreen theActionID)
+									)
+								)
+							(block Nil
+								(scrSetActionLabel gScreen 'actionControls "Q - Unlock Cursor" "Q")
+								(enum (list 'actionCenterUp 'actionCenterDown 'actionCenterLeft 'actionCenterRight 'actionCursorUp 'actionCursorDown 'actionCursorLeft 'actionCursorRight 'actionZoomIn 'actionZoomOut 'actionHeightUp 'actionHeightDown 'actionWidthUp 'actionWidthDown) theActionID
+									(scrRemoveAction gScreen theActionID)
+									)
+								)
+							(switch
+								(leq cmsRange 125)
+									(scrRemoveAction gScreen 'actionZoomIn)
+									
+								(geq cmsRange 750)
+									(scrRemoveAction gScreen 'actionZoomOut)
+								)
+							)
+						)
+				</OnPaneInit>
+				<Actions>
+					<!--
+					<Action id="actionView">
+						(errBlock (e)
+							(print "Scanner Screen: View")
+							(switch
+								(not (isErr cmsItem))
+									(setq cmsItem
+										(objSetItemData gSource cmsItem 'screenState {
+											cmsCursorX: cmsCursorX
+											cmsCursorY: cmsCursorY
+											cmsCursorWidth: cmsCursorWidth
+											cmsCursorHeight: cmsCursorHeight
+											cmsXCursorNW: cmsXCursorNW
+											cmsYCursorNW: cmsYCursorNW
+											cmsXCursorNE: cmsXCursorNE
+											cmsYCursorNE: cmsYCursorNE
+											cmsXCursorSE: cmsXCursorSE
+											cmsYCursorSE: cmsYCursorSE
+											cmsXCursorSW: cmsXCursorSW
+											cmsYCursorSW: cmsYCursorSW
+											cmsShipList: cmsShipList
+											cmsStationList: cmsStationList
+											cmsExamineList: cmsExamineList
+											})
+										)
+									
+								(not (isErr gSource))
+									(objSetData gSource 'screenState {
+										cmsCursorX: cmsCursorX
+										cmsCursorY: cmsCursorY
+										cmsCursorWidth: cmsCursorWidth
+										cmsCursorHeight: cmsCursorHeight
+										cmsXCursorNW: cmsXCursorNW
+										cmsYCursorNW: cmsYCursorNW
+										cmsXCursorNE: cmsXCursorNE
+										cmsYCursorNE: cmsYCursorNE
+										cmsXCursorSE: cmsXCursorSE
+										cmsYCursorSE: cmsYCursorSE
+										cmsXCursorSW: cmsXCursorSW
+										cmsYCursorSW: cmsYCursorSW
+										cmsShipList: cmsShipList
+										cmsStationList: cmsStationList
+										cmsExamineList: cmsExamineList
+										})
+								)
+							(sysSetPOV (sysVectorPixelOffset gSource (* (- cmsCursorX 300) cmsScaleDistance) (* (- 200 cmsCursorY) cmsScaleDistance)))
+							(scrExitScreen gScreen)
+							)
+					</Action>
+					-->
+					<Action id="actionExamine" minor="true">
+						<!--	--
+						(block (counter)
+							(setq counter (scrGetCounter gScreen))
+							(scrShowScreen gScreen &dsExamineObject; {
+								object: (@ (scrGetData gScreen "cmsExamineList") (- counter 1))
+								})
+							;(scrSetDesc gScreen (cat "Examining object #" counter ": " (objGetName object 0x04)))
+							;(objSetShowAsDestination object 'autoClear)
+							)
+						<!--	--
+						(block Nil
+							(setq examineObjectDesc (scrGetDesc gScreen))
+							(scrShowPane gScreen "ExamineObject")
+							)
+						<!--	-->
+						(scrShowScreen gScreen &dsManageObjects;)
+					</Action>
+					<Action id="actionRefresh"	minor="true">
+						(block Nil
+							(scnInitializeObjects)
+							(scrShowPane gScreen "Default")
+							)
+					</Action>
+					<Action id="actionControls"	minor="true">
+						(block Nil
+							(setq cmsShow (not cmsShow))
+							;Update the examine pane
+							(scrShowPane gScreen "Default")
+							)
+					</Action>
+					<Action	id="actionManual"	minor="true">
+						(scrShowScreen gScreen &dsCommandScreenManual;)
+					</Action>
+					<Action	id="actionMarkerCreate"	minor="true">
+						(block	(
+									(xPos (/ (+ cmsXCursorNE cmsXCursorNW cmsXCursorSE cmsXCursorSW) 4))
+									(yPos (/ (+ cmsYCursorNE cmsYCursorNW cmsYCursorSE cmsYCursorSW) 4))
+									(xDiff (- xPos cmsOriginX))
+									(yDiff (- cmsOriginY yPos))
+									(lightSecondScale (* cmsScaleDistance 24))
+									)
+							(sysCreateMarker "Command Marker" (sysVectorPixelOffset gSource (* xDiff lightSecondScale) (* yDiff lightSecondScale)) (objGetSovereign gSource))
+							
+							(scnInitializeObjects)
+							(scrShowPane gScreen "Default")
+							)
+					</Action>
+					<Action	id="actionViewDockedShips"	minor="true">
+						(scrShowScreen gScreen &dsViewDockedShips;)
+					</Action>
+					<Action	id="actionSubordinates"		minor="true">
+						(block Nil
+							(setq cmsExamineObject gSource)
+							(scrShowScreen gScreen &dsOrderSubordinates;)
+							)
+					</Action>
+					
+					<!--
+					<Action id="actionSelect">
+						(block (counter cmsExamineList entry)
+							(setq counter (scrGetCounter gScreen))
+							(setq cmsExamineList (scrGetData gScreen "cmsExamineList"))
+							(setq entry (@ cmsExamineList counter))
+							(set@ entry 0 (not (@ entry 0)))
+							(scrSetData gScreen "cmsExamineList" cmsExamineList)
+							)
+					</Action>
+					-->
+					
+					<!--
+					<Action id="actionHide">
+						(block Nil
+							(setq cmsShow Nil
+							
+							;Update the examine pane
+							(scrShowPane gScreen "Default")
+							)
+					</Action>
+					-->
+					<Action id="actionCursorUp"	minor="true">
+						<!--
+						(setq cmsCursorY (- cmsCursorY 1))
+						-->
+						
+						(block Nil
+							(setq cmsYCursorNE (- cmsYCursorNE cmsCursorSpeed))
+							(setq cmsYCursorNW (- cmsYCursorNW cmsCursorSpeed))
+							(setq cmsYCursorSE (- cmsYCursorSE cmsCursorSpeed))
+							(setq cmsYCursorSW (- cmsYCursorSW cmsCursorSpeed))
+							
+							;Update the examine pane
+							(scrShowPane gScreen "Default")
+							)
+					</Action>
+					<Action id="actionCursorDown"	minor="true">
+						<!--
+						(setq cmsCursorY (+ cmsCursorY 1))
+						-->
+						
+						(block Nil
+							(setq cmsYCursorNE (+ cmsYCursorNE cmsCursorSpeed))
+							(setq cmsYCursorNW (+ cmsYCursorNW cmsCursorSpeed))
+							(setq cmsYCursorSE (+ cmsYCursorSE cmsCursorSpeed))
+							(setq cmsYCursorSW (+ cmsYCursorSW cmsCursorSpeed))
+							
+							;Update the examine pane
+							(scrShowPane gScreen "Default")
+							)
+					</Action>
+					<Action id="actionCursorLeft"	minor="true">
+						<!--
+						(setq cmsCursorX (- cmsCursorX 1))
+						-->
+						
+						(block Nil
+							(setq cmsXCursorNE (- cmsXCursorNE cmsCursorSpeed))
+							(setq cmsXCursorNW (- cmsXCursorNW cmsCursorSpeed))
+							(setq cmsXCursorSE (- cmsXCursorSE cmsCursorSpeed))
+							(setq cmsXCursorSW (- cmsXCursorSW cmsCursorSpeed))
+							
+							;Update the examine pane
+							(scrShowPane gScreen "Default")
+							)
+					</Action>
+					<Action id="actionCursorRight"	minor="true">
+						<!--
+						(setq cmsCursorX (+ cmsCursorX 1))
+						-->
+						
+						(block Nil
+							(setq cmsXCursorNE (+ cmsXCursorNE cmsCursorSpeed))
+							(setq cmsXCursorNW (+ cmsXCursorNW cmsCursorSpeed))
+							(setq cmsXCursorSE (+ cmsXCursorSE cmsCursorSpeed))
+							(setq cmsXCursorSW (+ cmsXCursorSW cmsCursorSpeed))
+							
+							;Update the examine pane
+							(scrShowPane gScreen "Default")
+							)
+					</Action>
+					<Action id="actionHeightUp"	minor="true">
+						<!--
+						(setq cmsCursorHeight (+ cmsCursorHeight 1))
+						-->
+						
+						(block Nil
+							(setq cmsCursorHeight (+ cmsCursorHeight cmsCursorSpeed))
+							
+							(setq cmsYCursorNW (- cmsYCursorNW cmsCursorSpeed))
+							(setq cmsYCursorNE (- cmsYCursorNE cmsCursorSpeed))
+							
+							(setq cmsYCursorSW (+ cmsYCursorSW cmsCursorSpeed))
+							(setq cmsYCursorSE (+ cmsYCursorSE cmsCursorSpeed))
+							
+							;Update the examine pane
+							(scrShowPane gScreen "Default")
+							)
+					</Action>
+					<Action id="actionHeightDown"	minor="true">
+						(if (gr cmsCursorHeight 1)
+							<!--
+							(setq cmsCursorHeight (- cmsCursorHeight 1))
+							-->
+							(block Nil
+								(setq cmsCursorHeight (- cmsCursorHeight cmsCursorSpeed))
+								
+								(setq cmsYCursorNW (+ cmsYCursorNW cmsCursorSpeed))
+								(setq cmsYCursorNE (+ cmsYCursorNE cmsCursorSpeed))
+								
+								(setq cmsYCursorSW (- cmsYCursorSW cmsCursorSpeed))
+								(setq cmsYCursorSE (- cmsYCursorSE cmsCursorSpeed))
+								
+								;Update the examine pane
+								(scrShowPane gScreen "Default")
+								)
+							)
+					</Action>
+					<Action id="actionWidthUp"	minor="true">
+						<!--
+						(setq cmsCursorWidth (+ cmsCursorWidth 1))
+						-->
+						
+						(block Nil
+							(setq cmsCursorWidth (+ cmsCursorWidth cmsCursorSpeed))
+							
+							(setq cmsXCursorNE (+ cmsXCursorNE cmsCursorSpeed))
+							(setq cmsXCursorSE (+ cmsXCursorSE cmsCursorSpeed))
+							(setq cmsXCursorNW (- cmsXCursorNW cmsCursorSpeed))
+							(setq cmsXCursorSW (- cmsXCursorSW cmsCursorSpeed))
+							
+							;Update the examine pane
+							(scrShowPane gScreen "Default")
+							)
+					</Action>
+					<Action id="actionWidthDown"	minor="true">
+						(if (gr cmsCursorWidth 1)
+							<!--
+							(setq cmsCursorWidth (- cmsCursorWidth 1))
+							-->
+							
+							(block Nil
+								(setq cmsCursorWidth (- cmsCursorWidth cmsCursorSpeed))
+								
+								(setq cmsXCursorNE (- cmsXCursorNE cmsCursorSpeed))
+								(setq cmsXCursorSE (- cmsXCursorSE cmsCursorSpeed))
+								(setq cmsXCursorNW (+ cmsXCursorNW cmsCursorSpeed))
+								(setq cmsXCursorSW (+ cmsXCursorSW cmsCursorSpeed))
+								
+								;Update the examine pane
+								(scrShowPane gScreen "Default")
+								)
+							)
+					</Action>
+					<Action id="actionCenterUp"	minor="true">
+						(block Nil
+							(setq cmsOriginY (+ cmsOriginY cmsCursorSpeed))
+							(scnInitializeObjects)
+							(scrShowPane gScreen "Default")
+							)
+					</Action>
+					<Action id="actionCenterDown"	minor="true">
+						(block Nil
+							(setq cmsOriginY (- cmsOriginY cmsCursorSpeed))
+							(scnInitializeObjects)
+							(scrShowPane gScreen "Default")
+							)
+					</Action>
+					<Action id="actionCenterLeft"	minor="true">
+						(block Nil
+							(setq cmsOriginX (+ cmsOriginX cmsCursorSpeed))
+							(scnInitializeObjects)
+							(scrShowPane gScreen "Default")
+							)
+					</Action>
+					<Action id="actionCenterRight"	minor="true">
+						(block Nil
+							(setq cmsOriginX (- cmsOriginX cmsCursorSpeed))
+							(scnInitializeObjects)
+							(scrShowPane gScreen "Default")
+							)
+					</Action>
+					<Action id="actionZoomIn"	minor="true">
+						(block Nil
+							;Double the screen center's distance to the origin
+							(setq cmsOriginX (- (* cmsOriginX 2) cmsCenterX))
+							(setq cmsOriginY (- (* cmsOriginY 2) cmsCenterY))
+							
+							(setq cmsScaleDistance (/ cmsScaleDistance 2))
+							(setq cmsScaleShip (/ cmsScaleShip 2))
+							(setq cmsScaleStation (/ cmsScaleStation 2))
+							
+							(scnInitializeObjects)
+							
+							(scrShowPane gScreen "Default")
+							)
+					</Action>
+					<Action id="actionZoomOut"	minor="true">
+						(block Nil
+							;Halve the screen center's distance to the origin
+							(setq cmsOriginX (+ cmsOriginX (/ (- cmsCenterX cmsOriginX) 2)))
+							(setq cmsOriginY (+ cmsOriginY (/ (- cmsCenterY cmsOriginY) 2)))
+							
+							(setq cmsScaleDistance (* cmsScaleDistance 2))
+							(setq cmsScaleShip (* cmsScaleShip 2))
+							(setq cmsScaleStation (* cmsScaleStation 2))
+							
+							(scnInitializeObjects)
+							
+							(scrShowPane gScreen "Default")
+							)
+					</Action>
+					<Action id="actionFinish">
+						(block Nil
+							<!--
+							(sysSetPOV gSource)
+							(switch
+								cmsItem
+									(setq cmsItem (objSetItemData gSource cmsItem 'screenState Nil))
+									
+								gSource
+									(objSetData gSource 'screenState Nil)
+								)
+							-->
+							(sysStartTime)
+							(scrExitScreen gScreen)
+							)
+					</Action>
+				</Actions>
+			</Default>
+			<!--
+			<ExamineObject
+					showCounter=	"true"
+					>
+				<OnPaneInit>
+					(block
+						(
+							(desc (cat examineObjectDesc "\nIn the counter below, enter the index of the object to examine."))
+							(index (scrGetCounter gScreen))
+							(selected (@ cmsExamineList (- (scrGetCounter gScreen) 1)))
+							)
+						(scrSetCounter gScreen 1)
+						(if selected
+							(setq desc (cat desc "\nObject at index " (+ index 1) ": " (objGetName selected 0x04) "."))
+							(setq desc (cat desc "\nNo object at index " (+ index 1) "."))
+							)
+						(scrEnableAction gScreen 0 selected)
+						(scrSetDesc gScreen desc)
+						)
+				</OnPaneInit>
+				<Actions>
+					<Action name="Examine" key="E" default="1">
+						(block Nil
+							(setq cmsExamineObject (@ cmsExamineList (- (scrGetCounter gScreen) 1)))
+							(scrShowScreen gScreen &dsExamineObject;)
+							)
+					</Action>
+					
+					<Action name="Select" key="S">
+						(block
+							(
+								(object (@ cmsExamineList (- (scrGetCounter gScreen) 1)))
+								(index (find cmsSelectedList object))
+								(desc (scrGetDesc gScreen))
+								textIndex
+								)
+							(if
+								(or
+									(setq textIndex (strFind desc "\nDeselected"))
+									(setq textIndex (strFind desc "\nSelected"))
+									)
+								(setq desc (subset desc 0 textIndex))
+								)
+							(if index
+								(block Nil
+									(lnkRemove cmsSelectedList index)
+									(setq desc (cat desc "\nDeselected object: " (objGetName object 0x04)))
+									)
+								(block Nil
+									(lnkAppend cmsSelectedList object)
+									(setq desc (cat desc "\nSelected object: " (objGetName object 0x04)))
+									)
+								)
+							(scrSetDesc gScreen desc)
+							)
+					</Action>
+					
+					<Action name="Cancel" key="C" cancel="1">
+						(scrShowPane gScreen "Default")
+					</Action>
+				</Actions>
+			</ExamineObject>
+			-->
+		</Panes>
+		
+		<Language>
+			<!--
+			<Text id="actionView">"[V]iew"</Text>
+			<Text id="actionSelect">"Select/Deselect"</Text>
+			-->
+			<Text id="actionFinish">"[Escape] Done"</Text>
+			
+			<Text id="actionRefresh">"[R]efresh"</Text>
+			
+			<Text id="actionManual">"[M]anual"</Text>
+			<Text id="actionMarkerCreate">"[C]reate Marker"</Text>
+			<Text id="actionViewDockedShips">"[V]iew Docked Ships"</Text>
+			<Text id="actionSubordinates">"[S]ubordinates"</Text>
+			
+			<Text id="actionControls">"[Q] - Lock/Unlock Cursor"</Text>
+			<Text id="actionExamine">"[E]xamine"</Text>
+			<Text id="actionZoomIn">"[X] - Zoom In"</Text>
+			<Text id="actionZoomOut">"[Z] - Zoom Out"</Text>
+			
+			<Text id="actionCursorUp">"[W] - Move Cursor Up"</Text>
+			<Text id="actionCursorDown">"[S] - Move Cursor Down"</Text>
+			<Text id="actionCursorLeft">"[A] - Move Cursor Left"</Text>
+			<Text id="actionCursorRight">"[D] - Move Cursor Right"</Text>
+			
+			<Text id="actionHeightUp">"[T] - Increase Cursor Height"</Text>
+			<Text id="actionHeightDown">"[G] - Decrease Cursor Height"</Text>
+			<Text id="actionWidthUp">"[H] - Increase Cursor Width"</Text>
+			<Text id="actionWidthDown">"[F] - Decrease Cursor Width"</Text>
+			
+			<Text id="actionCenterUp">"[I] Move Center Up"</Text>
+			<Text id="actionCenterDown">"[K] Move Center Down"</Text>
+			<Text id="actionCenterLeft">"[J] Move Center Left"</Text>
+			<Text id="actionCenterRight">"[L] Move Center Right"</Text>
+		</Language>
+	</DockScreen>
+
+	<DockScreen UNID="&dsManageObjects;"
+			name=				"Object Manager"
+			type=				"customPicker"
+			>
+		;nestedScreen=		"true"
+		<OnScreenInit>
+			(block
+				(
+					)
+				(setq cmsList
+					(map
+						cmsExamineList
+						theObject
+						(list
+							(scnGetCustomName
+								theObject
+								)
+							Nil
+							(cat
+								(if (objMatches theObject gSource cmsSubordinateCriteria)
+									"Subordinate"
+									)
+								(if (find cmsSelectedList theObject)
+									" Selected"
+									Nil
+									)
+								)
+							theObject
+							)
+						)
+					)
+				)
+		</OnScreenInit>
+		<List
+			rowHeight="48"
+			>
+			cmsList
+		</List>
+
+		<Panes>
+			<Default
+					desc=		"There are no objects.">
+				<OnPaneInit>
+					(block Nil
+						(scrSetDesc gScreen (cat "There are " (count cmsExamineList) " objects"))
+						(if (not (eq (objGetName (@ cmsExamineList (scrGetListCursor gScreen))) "Command Marker"))
+							(scrRemoveAction gScreen 'actionRemoveMarker)
+							)
+						)
+				</OnPaneInit>
+				<Actions>
+					<Action id="actionExamine" default="1">
+						(block Nil
+							(setq cmsExamineObject (@ cmsExamineList (scrGetListCursor gScreen)))
+							(scrShowScreen gScreen &dsExamineObject;)
+							)
+					</Action>
+					<Action id="actionSelect">
+						(block
+							(
+								(cursor (scrGetListCursor gScreen))
+								(object (@ cmsExamineList cursor))
+								(index (find cmsSelectedList object))
+								)
+							(if index
+								(lnkRemove cmsSelectedList index)
+								(lnkAppend cmsSelectedList object)
+								)
+							(print (cat "Selected " (objGetName object)))
+							(scrRefreshScreen gScreen)
+							(scrSetListCursor gScreen cursor)
+							)
+					</Action>
+					<Action id="actionCancel" cancel="1">
+						(block Nil
+							(scrExitScreen gScreen)
+							(scrShowScreen gScreen &dsCommandScreen; { custom: True })
+							)
+					</Action>
+					<Action id="actionRemoveMarker">
+						(objDestroy (@ cmsExamineList (scrGetListCursor gScreen)))
+					</Action>
+				</Actions>
+			</Default>
+		</Panes>
+		<Language>
+			<Text id="actionExamine">"[E]amine"</Text>
+			<Text id="actionSelect">"[S]elect"</Text>
+			<Text id="actionCancel">"[C]ancel"</Text>
+			<Text id="actionRemoveMarker">"[R]emove Marker"</Text>
+		</Language>
+	</DockScreen>
+	
+	<DockScreen unid="&dsExamineObject;"
+			name=				"=(scnGetCustomName cmsExamineObject)"
+			backgroundID=		"none"
+			nestedScreen=		"true"
+			>
+		<Display>
+			<Canvas>
+				(block	(
+							(getImageDesc (lambda (object)
+								(if (objIsShip object)
+									(shpGetImageDesc object (shpGetDirection object))
+									(objGetImageDesc object)
+									)
+								))
+							(examineImage
+								(getImageDesc cmsExamineObject)
+								)
+							(examineWidth (@ examineImage 3))
+							(examineHeight (@ examineImage 4))
+							(examineWidthHalf (/ examineWidth 2))
+							(examineHeightHalf (/ examineHeight 2))
+							)
+					(cnvDrawImage (- 300 examineWidthHalf) (- 200 examineHeightHalf) examineImage)
+					(enum
+						(filter (sysFindObject cmsExamineObject "*") theOther
+							(and (objMatches theOther gSource cmsMapCriteria) (ls (objGetDistance cmsExamineObject theOther) 20))
+							)
+						theNearby
+						(block	(
+									(distance (objGetDistance theNearby cmsExamineObject))
+									(angle (sysVectorAngle theNearby cmsExamineObject))
+									(image (getImageDesc theNearby))
+									(width (@ image 3))
+									(height (@ image 4))
+									(widthHalf (/ width 2))
+									(heightHalf (/ height 2))
+									(xPos (+ 300 (* (cos angle) (* 24 distance))))
+									(yPos (- 200 (* (sin angle) (* 24 distance))))
+									)
+							(cnvDrawImage (- xPos widthHalf) (- yPos heightHalf) image)
+							(print "Drawing Nearby Object")
+							)
+						)
+					)
+			</Canvas>
+		</Display>
+		<Panes>
+			<Default>
+				<OnPaneInit>
+					(block
+						(
+							(customName (objGetData cmsExamineObject "name_custom"))
+							)
+						(scrSetDesc
+							gScreen
+							(cat
+								"You are examining "
+								(objGetName cmsExamineObject)
+								(if customName
+									(cat "\nCustom name: " customName)
+									)
+								)
+							)
+						(scrEnableAction gScreen 'actionViewItems (or (eq cmsExamineObject gSource) (objMatches cmsExamineObject gSource cmsSubordinateCriteria)))
+						)
+				</OnPaneInit>
+				<Actions>
+					<Action id="actionCustomName"	minor="true">
+						(scrShowPane gScreen "SetCustomName")
+					</Action>
+					<!--
+					<Action id="actionView"	minor="true">
+						(block ()
+							(sysSetPOV cmsExamineObject)
+							(scrExitScreen gScreen 'forceUndock)
+							)
+					</Action>
+					-->
+					<Action id="actionShowOnMap"	minor="true">
+						(block Nil
+							(objSetShowAsDestination cmsExamineObject 'autoClear)
+							(scrSetDesc gScreen "Marked on system map.")
+							)
+					</Action>
+					<Action id="actionViewItems">
+						(scrShowScreen gScreen &dsManageItems;)
+					</Action>
+					<Action id="actionOrderSubordinates">
+						(scrShowScreen gScreen &dsOrderSubordinates;)
+					</Action>
+				</Actions>
+			</Default>
+			<SetCustomName
+				showTextInput="true">
+					
+				<OnPaneInit>
+					(block
+						(
+							(object cmsExamineObject)
+							)
+						(scrSetDesc gScreen (cat "You are setting a new custom name for a " (objGetName object) "\nCurrent custom name: " (objGetData object "name_custom")))
+						)
+				</OnPaneInit>
+				<Actions>
+					<Action name="Done" key="D" default="1">
+						(block
+							(
+								(input (scrGetInputText gScreen))
+								)
+							
+							(if (eq input "")
+								(setq input Nil)
+								)
+							(objSetData cmsExamineObject "name_custom" input)
+							(scrShowPane gScreen "Default")
+							)
+					</Action>
+
+					<Action name="Cancel" key="C" cancel="1">
+						(scrShowPane gScreen "Default")
+					</Action>
+				</Actions>
+			</SetCustomName>
+		</Panes>
+		
+		<Language>
+			<Text id="actionCustomName">"Assign Custom [N]ame"</Text>
+			<Text id="actionView">"[L]ook"</Text>
+			<Text id="actionShowOnMap">"Show on system [M]ap"</Text>
+			<Text id="actionViewItems">"View [I]tems"</Text>
+			<Text id="actionOrderSubordinates">"Order [S]ubordinates"</Text>
+		</Language>
+	</DockScreen>
+	
+	<DockScreen UNID="&dsManageItems;"
+			name=				"=(cat (scnGetCustomName cmsExamineObject) &quot; (Item Manager)&quot;)"
+			
+			type=				"itemPicker"
+			nestedScreen=		"true"
+			>
+
+		<ListOptions
+			dataFrom=	"=cmsExamineObject"
+			list=		"*"
+			/>
+
+		<Panes>
+			<Default
+					desc=		"There are no items here.">
+
+				<OnPaneInit>
+					(block	(
+								thisItem
+								(removeOrDisableAction (lambda (actionID requiredOption condition)
+									(switch
+										(not (@ gData requiredOption))
+											(scrRemoveAction gScreen actionID)
+										(scrEnableAction gScreen actionID condition)
+										)
+									))
+								)
+						(setq thisItem (scrGetItem gScreen))
+						(if thisItem
+							(block (desc multiple value)
+								(setq cmsMaxCount (itmGetCount thisItem))
+								(setq multiple (gr cmsMaxCount 1))
+								(if (itmIsInstalled thisItem)
+									(setq desc "Installed\n")
+									)
+								(setq desc (cat desc "Unit mass: " (strMassString (itmGetMass thisItem))))
+								(if multiple
+									(setq desc (cat desc " (" cmsMaxCount " at " (strMassString (multiply (itmGetMass thisItem) cmsMaxCount)) ")"))
+									)
+								<!--
+								(setq value (itmGetActualPrice thisItem))
+								(setq desc (cat desc "\n\n"))
+								(setq desc (cat desc "Unit value: " value " credits"))
+								-->
+								(if multiple
+									(setq desc (cat desc " (" cmsMaxCount " at " (multiply value cmsMaxCount) " credits)"))
+									)
+								(scrSetDesc gScreen desc)
+								)
+							(setq cmsMaxCount 0)
+							)
+						(removeOrDisableAction 'actionRemoveDevice 'allowDeviceRemove (itmMatches thisItem 'dI))
+						(removeOrDisableAction 'actionInstallDevice 'allowDeviceInstall (itmMatches thisItem 'dU))
+						(removeOrDisableAction 'actionReplaceArmor 'allowArmorReplace (itmMatches thisItem 'aI))
+						(removeOrDisableAction 'actionTakeItem 'allowItemTake (itmMatches thisItem "*U"))
+						(removeOrDisableAction 'actionGiveItem 'allowItemGive True)
+						)
+				</OnPaneInit>
+
+				<Actions>
+					<Action id="actionInstallDevice">
+						(block Nil
+							(shpInstallDevice cmsExamineObject (scrGetItem gScreen))
+							(scrRefreshScreen gScreen)
+							)
+					</Action>
+					<Action	id="actionRemoveDevice">
+						(block Nil
+							(shpRemoveDevice cmsExamineObject (scrGetItem gScreen))
+							(scrRefreshScreen gScreen)
+							)
+					</Action>
+					<Action	id="actionReplaceArmor">
+						(scrShowScreen gScreen &dsReplaceArmor; { armorSegment: (itmGetArmorInstalledLocation (scrGetItem gScreen)) })
+					</Action>
+					<Action id="actionTakeItem">
+						(if (gr cmsMaxCount 1)
+							(scrShowPane gScreen "LootQuantity")
+							(if (eq cmsMaxCount 1)
+								(block (itemsToLoot)
+									(setq itemsToLoot (scrRemoveItem gScreen 1))
+									(objAddItem cmsPlayerShip itemsToLoot)
+									(scrShowPane gScreen "Default")
+									)
+								)
+							)
+					</Action>
+					<Action	id="actionGiveItem">
+						(scrShowScreen gSource &dsRPGJettison; {sourceObj:cmsExamineObject})
+					</Action>
+					<Action id="actionDone" cancel="1">
+						(scrExitScreen gScreen)
+					</Action>
+				</Actions>
+			</Default>
+			<LootQuantity
+					showCounter=	"true">
+
+				<OnPaneInit>
+					(block Nil
+						(scrSetDesc gScreen (cat "How many items do you wish to take?"))
+						(scrSetCounter gScreen cmsMaxCount)
+						)
+				</OnPaneInit>
+
+				<Actions>
+					<Action name="Take" default="1" key="T">
+						(block (count)
+							(setq count (scrGetCounter gScreen))
+							(if (gr count cmsMaxCount)
+								(scrSetCounter gScreen cmsMaxCount)
+								(block (itemsToLoot)
+									(setq itemsToLoot (scrRemoveItem gScreen count))
+									(objAddItem cmsPlayerShip itemsToLoot)
+									(scrShowPane gScreen "Default")
+									)
+								)
+							)
+					</Action>
+					<Action name="Cancel" cancel="1" key="C">
+						<ShowPane pane="Default"/>
+					</Action>
+				</Actions>
+			</LootQuantity>
+		</Panes>
+		<Language>
+			<Text id="actionInstallDevice">"[I]nstall Device"</Text>
+			<Text id="actionRemoveDevice">"[R]emove Device"</Text>
+			<Text id="actionReplaceArmor">"[R]eplace Armor"</Text>
+			<Text id="actionTakeItem">"[T]ake Item"</Text>
+			<Text id="actionGiveItem">"[G]ive Items"</Text>
+			<Text id="actionDone">"[D]one"</Text>
+		</Language>
+	</DockScreen>
+	<DockScreen UNID="&dsReplaceArmor;"
+			name=				"=(cat (scnGetCustomName cmsExamineObject) &quot; (Replace Armor)&quot;)"
+			
+			type=				"itemPicker"
+			nestedScreen=		"true"
+			>
+
+		<ListOptions
+			dataFrom=	"=cmsExamineObject"
+			list=		"aU"
+			/>
+
+		<Panes>
+			<Default
+					desc=		"There are no armor segments to install.">
+
+				<OnPaneInit>
+					(block	(
+								thisItem
+								)
+						(setq thisItem (scrGetItem gScreen))
+						(if thisItem
+							(scrSetDesc gScreen (cat "Unit mass: " (strMassString (itmGetMass thisItem))))
+							(scrEnableAction gScreen 0 Nil)
+							)
+						)
+				</OnPaneInit>
+
+				<Actions>
+					<Action	name="Select"	key="S">
+						(block Nil
+							(shpInstallArmor cmsExamineObject (scrGetItem gScreen) (@ gData 'armorSegment))
+							(scrExitScreen gScreen)
+							)
+					</Action>
+					<Action name="Cancel"	cancel="1"	key="C">
+						(scrExitScreen gScreen)
+					</Action>
+				</Actions>
+			</Default>
+		</Panes>
+	</DockScreen>
+	<DockScreen UNID="&dsOrderSubordinates;"
+			name=				"=(cat (scnGetCustomName cmsExamineObject) &quot; (Subordinate Manager)&quot;)"
+			type=				"customPicker"
+			nestedScreen=		"true"
+			
+			>
+
+		<OnScreenInit>
+			(block
+				(
+					)
+				(setq cmsImmediate Nil)
+				(setq cmsOrderSelected Nil)
+				(setq cmsList
+					(sort
+						(map
+							(sysFindObject
+								gSource
+								cmsSubordinateCriteria
+								)
+							theShip
+							(list
+								(scnGetCustomName
+									theShip
+									)
+								Nil
+								(if (find cmsSelectedList theShip)
+									"Selected"
+									Nil
+									)
+								theShip
+								)
+							)
+						0
+						)
+					)
+					
+				(if cmsShipListNameFilter
+					(setq cmsList (filter cmsList theEntry (strFind (@ theEntry 0) cmsShipListNameFilter)))
+					)
+				)
+		</OnScreenInit>
+		<List
+			rowHeight="48"
+			>
+			cmsList
+		</List>
+
+		<Panes>
+			<Default
+					desc=		"You have no subordinates."> ;FINISH THIS <!------------------------------------------------------------------->
+				<OnPaneInit>
+					<!--(setq cmsShip (@ gcmsShipList (find cmsList (scrGetListEntry gScreen))))-->
+					(block ((listEntry (scrGetListEntry gScreen)))
+						(if (setq cmsShip (@ listEntry 3))
+							(block (desc name orderDesc order target orderString)
+								(setq name (@ listEntry 0))
+								(setq orderDesc (shpGetOrderDesc cmsShip))
+								(setq order (@ orderDesc 0))
+								(setq target (@ orderDesc 1))
+								<!--
+								(switch
+									(eq order 'gate)
+										(if target
+											(setq orderString (cat "gate through " (setq targetName (objGetName target))))
+											(setq orderString "gate")
+											)
+									(or
+										(eq order 'hold)
+										(eq order 'wait)
+										)
+										(if target
+											(setq orderString (cat order " for " target " ticks"))
+											(setq orderString order)
+											)
+									(or
+										(eq order 'attack)
+										(eq order 'dock)
+										(eq order 'escort)
+										(eq order 'follow)
+										(eq order 'goto)
+										(eq order 'guard)
+										)
+										(setq orderString (cat order " " (setq targetName (objGetName target))))
+									)
+								-->
+								(switch
+									(or
+										(eq order 'hold)
+										(eq order 'wait)
+										)
+										(if target
+											(setq orderString (cat
+												order "\n"
+												"Duration: " target
+												))
+											(setq orderString order)
+											)
+									(find '(attack escort follow goto guard gate dock patrol orbit) order)
+										(setq orderString (cat
+											order "\n"
+											"Target: " (scnGetCustomName target) "\n"
+											"Distance from target: " (objGetDistance cmsShip target) " light seconds"
+											))
+									(setq orderString (cat order target))
+									)
+								(setq desc (cat
+									"Here you can manage your subordinates\n"
+									"Ship name: " name "\n"
+									"Current order: " orderString "\n"
+									"Distance from selected: " (objGetDistance cmsShip cmsExamineObject) "\n"
+									"Distance from you: " (objGetDistance cmsShip gSource)
+									))
+								(scrSetDesc gScreen desc)
+								
+								(if cmsImmediate
+									(scrSetActionLabel gScreen 'actionToggleImmediate "Immediate: True" "I")
+									(scrSetActionLabel gScreen 'actionToggleImmediate "Immediate: False" "I")
+									)
+								(if cmsOrderSelected
+									(scrSetActionLabel gScreen 'actionToggleOrderSelected "Order Only Selected Subordinates: True" "O")
+									(scrSetActionLabel gScreen 'actionToggleOrderSelected "Order Only Selected Subordinates: False" "O")
+									)
+								<!--
+								(for i 0 5
+									(scrEnableAction gScreen i True)
+									)
+								-->
+								)
+							(block Nil
+								(scrSetDesc gScreen "You have no subordinates")
+								(enum (list <!--'actionView-->  'actionSelect 'actionToggleOrderSelected 'actionToggleImmediate 'actionCancelOrders 'actionGuard 'actionPatrol 'actionEscort 'actionAttack 'actionLoot) theActionID
+									(scrEnableAction gScreen theActionID Nil)
+									)
+								)
+							)
+						)
+					;DISABLE THE ACTIONS IF NO SHIPS AVAILABLE
+				</OnPaneInit>
+				<Actions>
+					<!--
+					<Action id="actionView">
+						(sysSetPOV cmsShip)
+					</Action>
+					-->
+					<Action id="actionSelect" minor="true">
+						(block
+							(
+								(cursor (scrGetListCursor gScreen))
+								(index (find cmsSelectedList cmsShip))
+								(immediate cmsImmediate)
+								(orderSelected cmsOrderSelected)
+								)
+							(if index
+								(lnkRemove cmsSelectedList index)
+								(lnkAppend cmsSelectedList cmsShip)
+								)
+							(print (cat "Selected " (objGetName cmsShip)))
+							(scrRefreshScreen gScreen)
+							(setq cmsImmediate immediate)
+							(setq cmsOrderSelected orderSelected)
+							(scrSetListCursor gScreen cursor)
+							)
+					</Action>
+					<Action id="actionToggleOrderSelected"	minor="true">
+						(block ()
+							(setq cmsOrderSelected (not cmsOrderSelected))
+							(scrShowPane gScreen "Default")
+							)
+					</Action>
+					<Action id="actionToggleImmediate"	minor="true">
+						(block ()
+							(setq cmsImmediate (not cmsImmediate))
+							(scrShowPane gScreen "Default")
+							)
+					</Action>
+					<Action id="actionCancelOrders"	minor="true">
+						(block Nil
+							(scnCancelSubordinateOrders)
+							(scrShowPane gScreen "Default")
+							)
+					</Action>
+					<Action id="actionGuard"	minor="true">
+						(scnOrderSubordinates 'guard)
+					</Action>
+					<Action id="actionPatrol"	minor="true">
+						(scnOrderSubordinates 'patrol)
+					</Action>
+					<Action id="actionEscort"	minor="true">
+						(scnOrderSubordinates 'escort)
+					</Action>
+					<Action id="actionAttack"	minor="true">
+						(scnOrderSubordinates 'attack)
+					</Action>
+					<Action id="actionLoot"	minor="true">
+						(scnOrderSubordinates 'loot)
+					</Action>
+					<Action id="actionFilterByName">
+						(scrShowPane gScreen "FilterByName")
+					</Action>
+					
+					<Action id="actionDone" cancel="1">
+						(scrExitScreen gScreen)
+					</Action>
+				</Actions>
+				
+			</Default>
+			
+			<FilterByName
+				desc=			"Filtering ships by name"
+				showTextInput=	"true">
+				
+				<OnPaneInit>
+					(scrSetInputText gScreen cmsShipListNameFilter)
+				</OnPaneInit>
+				<Actions>
+					<Action name="Filter" key="F" default="1">
+						(block
+							(
+								(input (scrGetInputText gScreen))
+								)
+							(setq cmsShipListNameFilter (if (eq input "") Nil input))
+							
+							(scrShowPane gScreen "Default")
+							(scrRefreshScreen gScreen)
+							)
+					</Action>
+					<!--
+					<Action name="Reset" key="R">
+						(block Nil
+							(scrSetInputText gScreen Nil)
+							(scrSetData gScreen "cmsShipListNameFilter" Nil)
+							(scrRefreshScreen gScreen)
+							)
+					</Action>
+					-->
+					<Action name="Cancel" key="C" cancel="1">
+						(block Nil
+							(scrShowPane gScreen "Default")
+							(scrRefreshScreen gScreen)
+							)
+					</Action>
+				</Actions>
+			</FilterByName>
+			
+			<!--
+			<Ordered>
+				<OnPaneInit>
+					(scrSetDesc gScreen (scrGetData gScreen 'cmsNextDesc))
+				</OnPaneInit>
+				<Actions>
+					<Action id="actionContinue" default="1">
+						<ShowPane pane="Default"/>
+					</Action>
+				</Actions>
+			</Ordered>
+			-->
+		</Panes>
+		<Language>
+			<Text id="actionSelect">"[S]elect"</Text>
+			<Text id="actionToggleImmediate">"[I]mmediate"</Text>
+			<Text id="actionOrderSelected">"[O]rder Selected Subordinates"</Text>
+			<Text id="actionCancelOrders">"[C]ancel Orders"</Text>
+			<Text id="actionGuard">"[G]uard"</Text>
+			<Text id="actionPatrol">"[P]atrol"</Text>
+			<Text id="actionEscort">"[E]scort"</Text>
+			<Text id="actionAttack">"[A]ttack"</Text>
+			<Text id="actionLoot">"[L]oot"</Text>
+			<Text id="actionFilterByName">"[F]ilter By Name"</Text>
+			<Text id="actionDone">"[D]one"</Text>
+			<Text id="actionContinue">"[C]ontinue"</Text>
+		</Language>
+	</DockScreen>
+	<DockScreen UNID="&dsViewDockedShips;"
+			name=				"View Docked Ships"
+			type=				"customPicker"
+			nestedScreen=		"true"
+			
+			>
+
+		<OnScreenInit>
+			(setq cmsList (sort
+				(map
+					(sysFindObject
+						gSource
+						"s O:docked;"
+						)
+					theShip
+					(list
+						(scnGetCustomName
+							theShip
+							)
+						Nil
+						(if (find cmsSelectedList theShip)
+							"Selected"
+							Nil
+							)
+						theShip
+						)
+					)
+				0
+				))
+		</OnScreenInit>
+		<List
+			rowHeight="24"
+			>
+			cmsList
+		</List>
+
+		<Panes>
+			<Default
+					desc=		"You have no ships docked.">
+				<OnPaneInit>
+					<!--(setq cmsShip (@ gcmsShipList (find cmsList (scrGetListEntry gScreen))))-->
+					(block ((listEntry (scrGetListEntry gScreen)))
+						(if (setq cmsShip (@ listEntry 3))
+							(scrSetDesc gScreen "")
+							(block Nil
+								(scrSetDesc gScreen "You have no ships docked.")
+								(enum '(actionCustomName actionSelect actionManageItems) theActionID
+									(scrEnableAction gScreen theActionID Nil)
+									)
+								)
+							)
+						)
+				</OnPaneInit>
+				<Actions>
+					<Action id="actionCustomName">
+						(scrShowPane gScreen 'SetCustomName)
+					</Action>
+					<Action id="actionSelect">
+						(block
+							(
+								(cursor (scrGetListCursor gScreen))
+								(object (@ cmsExamineList cursor))
+								(index (find cmsSelectedList object))
+								)
+							(if index
+								(lnkRemove cmsSelectedList index)
+								(lnkAppend cmsSelectedList object)
+								)
+							(print (cat "Selected " (objGetName object)))
+							(scrRefreshScreen gScreen)
+							(scrSetListCursor gScreen cursor)
+							)
+					</Action>
+					<Action id="actionManageItems">
+						(block Nil
+							(setq cmsExamineObject cmsShip)
+							(scrShowScreen gScreen &dsManageItems; {
+								allowArmorReplace: True
+								allowDeviceInstall: True
+								allowDeviceRemove: True
+								allowItemGive: True
+								allowItemTake: True
+								})
+							)
+					</Action>
+					<Action id="actionDone">
+						(scrExitScreen gScreen)
+					</Action>
+				</Actions>
+				
+			</Default>
+			<SetCustomName
+				showTextInput="true">
+					
+				<OnPaneInit>
+					(block
+						(
+							(object cmsExamineObject)
+							)
+						(scrSetDesc gScreen (cat "You are setting a new custom name for a " (objGetName object) "\nCurrent custom name: " (objGetData object "name_custom")))
+						)
+				</OnPaneInit>
+				<Actions>
+					<Action name="Done" key="D" default="1">
+						(block
+							(
+								(input (scrGetInputText gScreen))
+								)
+							
+							(if (eq input "")
+								(setq input Nil)
+								)
+							(objSetData cmsExamineObject "name_custom" input)
+							(scrShowPane gScreen "Default")
+							)
+					</Action>
+
+					<Action name="Cancel" key="C" cancel="1">
+						(scrShowPane gScreen "Default")
+					</Action>
+				</Actions>
+			</SetCustomName>
+		</Panes>
+		<Language>
+			<Text id="actionCustomName">"Assign Custom [N]ame"</Text>
+			<Text id="actionSelect">"[S]elect"</Text>
+			<Text id="actionManageItems">"[M]anage Items"</Text>
+			<Text id="actionDone">"[D]one"</Text>
+		</Language>
+	</DockScreen>
+	
+	<DockScreen UNID="&dsCommandScreenManual;"
+			name=				"Command Screen Manual"
+			backgroundID=		"none"
+			nestedScreen=		"true"
+			>
+		<Language>
+			<Text	id="actionNextPage">"[N]ext Page"</Text>
+			<Text	id="actionPreviousPage">"[P]revious Page"</Text>
+		</Language>
+		<Display>
+			<Canvas>
+				(cnvDrawRect 0 0 600 500 '(0 0 0))
+			</Canvas>
+			<Text id="text" left="12" right="-12" top="16" bottom="-16"	font="Large" color="#ffffff">
+			</Text>
+		</Display>
+		<Panes>
+			<Default>
+				<OnPaneInit>
+					(block Nil
+						(scrSetDisplayText gScreen "text" (cat
+							"{/rtf "
+							"{/f:Title;/c:#ffffff; Command Screen User's Manual, First Edition}\n\n"
+							"}"
+							))
+						)
+				</OnPaneInit>
+
+				<Actions>
+					<Action	id="actionNextPage"	nextKey="1">
+						<ShowPane	pane="Page1"/>
+					</Action>
+					<Action name="Done" key="D"	cancel="1">
+						<Exit/>
+					</Action>
+				</Actions>
+			</Default>
+			<Page1>
+				<OnPaneInit>
+					(scrSetDisplayText gScreen "text" (cat
+						"{/rtf "
+						"{/f:SubTitle;/c:#ffffff; Introduction}\n"
+						"The Command Screen is a special tool that enables you to interact with the System Map and manage your subordinate ships. This manual gives a basic summary of each sub-screen that you will see.\n\n"
+						
+						"Next Page: Map Screen"
+						"}"
+						))
+				</OnPaneInit>
+				<Actions>
+					<Action	id="actionPreviousPage"	prevKey="1">
+						<ShowPane	pane="Default"/>
+					</Action>
+					<Action	id="actionNextPage"	nextKey="1">
+						<ShowPane	pane="Page2"/>
+					</Action>
+					<Action name="Done" key="D"	cancel="1">
+						<Exit/>
+					</Action>
+				</Actions>
+			</Page1>
+			<Page2>
+				<OnPaneInit>
+					(scrSetDisplayText gScreen "text" (cat
+						"{/rtf "
+						"{/f:SubTitle;/c:#ffffff; Map Screen}\n"
+						"The Map Screen is where you can see objects in the current system.\n\n"
+						
+						"{/f:Header;/c:#ffffff; Display}\n"
+						"-Stations are displayed as hollow rectangles.\n"
+						"-Ships are displayed as filled rectangles.\n"
+						"-Markers are displayed as crosses."
+						"-The cursor is displayed as a hollow rectangle.\n\n"
+						
+						"-Friendly objects are colored {/f:LargeBold;/c:#00ff00; green}.\n"
+						"-Neutral objects and markers are colored {/f:LargeBold;/c:#ffff00; yellow}.\n"
+						"-Enemy objects are colored {/f:LargeBold;/c:#ff0000; red}.\n"
+						"-Objects that cannot attack are colored {/f:LargeBold;/c:#0000ff; blue}.\n"
+						"-Objects that are selected are colored {/f:LargeBold;/c:#C0C0C0; grey}.\n"
+						"-Your ship is colored {/f:LargeBold;/c:#ffffff; white}.\n"
+						"-Your cursor is colored {/f:LargeBold;/c:#00ffff; light blue}.\n\n"
+						
+						"Next Page: Map Screen (Continued)"
+						"}"
+						))
+				</OnPaneInit>
+				<Actions>
+					<Action	id="actionPreviousPage"	prevKey="1">
+						<ShowPane	pane="Page1"/>
+					</Action>
+					<Action	id="actionNextPage"	nextKey="1">
+						<ShowPane	pane="Page3"/>
+					</Action>
+					<Action name="Done" key="D"	cancel="1">
+						<Exit/>
+					</Action>
+				</Actions>
+			</Page2>
+			<Page3>
+				<OnPaneInit>
+					(scrSetDisplayText gScreen "text" (cat
+						"{/rtf "
+						"{/f:SubTitle;/c:#ffffff; Map Screen (Continued)}\n"
+						"{/f:Header;/c:#ffffff; Controls}\n"
+						"-Press {/f:LargeBold;/c:#ffff00; E} to examine objects covered by your cursor.\n"
+						"-Press {/f:LargeBold;/c:#ffff00; R} to refresh the display.\n"
+						"-Press {/f:LargeBold;/c:#ffff00; Q} to lock and unlock the cursor.\n"
+						"-Press {/f:LargeBold;/c:#ffff00; F} to exit the Command Screen.\n"
+						
+						"{/f:Header;/c:#ffffff; When the cursor is locked:}\n"
+						"-Press {/f:LargeBold;/c:#ffff00; M} to view this manual.\n"
+						"-Press {/f:LargeBold;/c:#ffff00; C} to create a marker.\n"
+						"-Press {/f:LargeBold;/c:#ffff00; V} to manage your docked ships.\n"
+						"-Press {/f:LargeBold;/c:#ffff00; S} to give your subordinates orders regarding your own ship.\n\n"
+						
+						"{/f:Header;/c:#ffffff; When the cursor is unlocked:}\n"
+						"-Use the {/f:LargeBold;/c:#ffff00; W A S D} keys to move the cursor around the screen.\n"
+						"-Use the {/f:LargeBold;/c:#ffff00; T F G H} keys to resize the cursor's width and height.\n"
+						"-Use the {/f:LargeBold;/c:#ffff00; I J K L} keys to pan the screen.\n"
+						"-Use the {/f:LargeBold;/c:#ffff00; Z X} keys to zoom the screen in and out.\n"
+						"{/f:LargeBold;/c:#ff0000; -Note: When using these keys, be sure to press them without holding them down. If the screen freezes, release the keys to unfreeze.}\n\n"
+						
+						"In order to manage an object with the cursor, make sure that the center of the object's rectangle is covered by the bounds of the cursor.\n\n"
+						
+						"Next Page: Viewing Docked Ships"
+						"}"
+						))
+				</OnPaneInit>
+				<Actions>
+					<Action	id="actionPreviousPage"	prevKey="1">
+						<ShowPane	pane="Page2"/>
+					</Action>
+					<Action	id="actionNextPage"	nextKey="1">
+						<ShowPane	pane="Page4"/>
+					</Action>
+					<Action name="Done" key="D"	cancel="1">
+						<Exit/>
+					</Action>
+				</Actions>
+			</Page3>
+			<Page4>
+				<OnPaneInit>
+					(scrSetDisplayText gScreen "text" (cat
+						"{/rtf "
+						"{/f:SubTitle;/c:#ffffff; Viewing Docked Ships}\n"
+						"This menu allows you to manage items on any ships that are docked with your ship.\n\n"
+						"-To make subordinates dock with you, simply order them to Guard your ship.\n"
+						"-To install a device, choose an uninstalled device in the ship's inventory and press {/f:LargeBold;/c:#ffff00; I}.\n"
+						"-To remove a device, choose an installed device and press {/f:LargeBold;/c:#ffff00; R}.\n"
+						"-To replace an armor segment, choose an installed armor segment and press {/f:LargeBold;/c:#ffff00; A}. Then, choose an uninstalled armor segment.\n"
+						"-To take an item from the ship, choose an uninstalled item from its inventory and press {/f:LargeBold;/c:#ffff00; T}.\n"
+						"-To give an item to the ship, choose an uninstalled item from your ship's inventory and press {/f:LargeBold;/c:#ffff00; G}.\n\n"
+						
+						"Next Page: Object Manager"
+						"}"
+						))
+				</OnPaneInit>
+				<Actions>
+					<Action	id="actionPreviousPage"	prevKey="1">
+						<ShowPane	pane="Page3"/>
+					</Action>
+					<Action	id="actionNextPage"	nextKey="1">
+						<ShowPane	pane="Page5"/>
+					</Action>
+					<Action name="Done" key="D"	cancel="1">
+						<Exit/>
+					</Action>
+				</Actions>
+			</Page4>
+			<Page5>
+				<OnPaneInit>
+					(scrSetDisplayText gScreen "text" (cat
+						"{/rtf "
+						"{/f:SubTitle;/c:#ffffff; Object Manager}\n"
+						"When you have chosen some objects with your cursor, you can press {/f:LargeBold;/c:#ffff00; E} to examine them with the Object Manager.\n\n"
+						
+						"-In the Object Manager screen, press {/f:LargeBold;/c:#ffff00; E} to examine the current entry.\n"
+						"-You can press {/f:LargeBold;/c:#ffff00; S} to select an object. Selected objects always appear first in the list of entries.\n\n"
+						
+						"Next Page: Examining an Object"
+						"}"
+						))
+				</OnPaneInit>
+				<Actions>
+					<Action	id="actionPreviousPage"	prevKey="1">
+						<ShowPane	pane="Page4"/>
+					</Action>
+					<Action	id="actionNextPage"	nextKey="1">
+						<ShowPane	pane="Page6"/>
+					</Action>
+					<Action name="Done" key="D"	cancel="1">
+						<Exit/>
+					</Action>
+				</Actions>
+			</Page5>
+			<Page6>
+				<OnPaneInit>
+					(scrSetDisplayText gScreen "text" (cat
+						"{/rtf "
+						"{/f:SubTitle;/c:#ffffff; Examining an Object}\n"
+						"-Press {/f:LargeBold;/c:#ffff00; N} to assign a custom name to the current object. This custom name will appear in quotes after the object's name.\n"
+						"-Press {/f:LargeBold;/c:#ffff00; M} to highlight the object on the System Map outside of the Command Screen.\n"
+						"-Press {/f:LargeBold;/c:#ffff00; I} to view the items on the object. This works only if the object is one of your subordinates.\n"
+						"-Press {/f:LargeBold;/c:#ffff00; S} to give your subordinates orders regarding this object.\n\n"
+						
+						"Next Page: Ordering Subordinates"
+						"}"
+						))
+				</OnPaneInit>
+				<Actions>
+					<Action	id="actionPreviousPage"	prevKey="1">
+						<ShowPane	pane="Page5"/>
+					</Action>
+					<Action	id="actionNextPage"	nextKey="1">
+						<ShowPane	pane="Page7"/>
+					</Action>
+					<Action name="Done" key="D"	cancel="1">
+						<Exit/>
+					</Action>
+				</Actions>
+			</Page6>
+			<Page7>
+				<OnPaneInit>
+					(scrSetDisplayText gScreen "text" (cat
+						"{/rtf "
+						"{/f:SubTitle;/c:#ffffff; Ordering Subordinates}\n"
+						"-Press {/f:LargeBold;/c:#ffff00; F} to filter subordinates by name.\n"
+						"-Press {/f:LargeBold;/c:#ffff00; S} to Select the current object under the list cursor.\n"
+						"-Press {/f:LargeBold;/c:#ffff00; I} to make your next order have first priority.\n"
+						"-Press {/f:LargeBold;/c:#ffff00; O} to make your next order or order cancellation apply to all currently Selected subordinates. Note: By default, orders apply to the only the object currently under the list cursor. If this option is enabled, the order will not apply to the object under the cursor.\n"
+						"-Press {/f:LargeBold;/c:#ffff00; C} to cancel orders.\n"
+						"-Press {/f:LargeBold;/c:#ffff00; G} to send a Guard order.\n"
+						"-Press {/f:LargeBold;/c:#ffff00; P} to send a Patrol order.\n"
+						"-Press {/f:LargeBold;/c:#ffff00; E} to send a Escort order.\n"
+						"-Press {/f:LargeBold;/c:#ffff00; A} to send a Attack order.\n"
+						"-Press {/f:LargeBold;/c:#ffff00; L} to send a Loot order.\n\n"
+						
+						"Next Page: End of Manual"
+						"}"
+						))
+				</OnPaneInit>
+				<Actions>
+					<Action	id="actionPreviousPage"	prevKey="1">
+						<ShowPane	pane="Page6"/>
+					</Action>
+					<Action	id="actionNextPage"	nextKey="1">
+						<ShowPane	pane="Page8"/>
+					</Action>
+					<Action name="Done" key="D"	cancel="1">
+						<Exit/>
+					</Action>
+				</Actions>
+			</Page7>
+			<Page8>
+				<OnPaneInit>
+					(scrSetDisplayText gScreen "text" (cat
+						"{/rtf "
+						"{/f:SubTitle;/c:#ffffff; End of Manual}\n"
+						"Please send feedback and suggestions on the Mod Announcements thread.\n\n"
+						"}"
+						))
+				</OnPaneInit>
+				<Actions>
+					<Action	id="actionPreviousPage"	prevKey="1">
+						<ShowPane	pane="Page7"/>
+					</Action>
+					<Action name="Done" key="D"	cancel="1">
+						<Exit/>
+					</Action>
+				</Actions>
+			</Page8>
+		</Panes>
+
+	</DockScreen>
+	
+	<!--
+		Global Variables
+			Name				Can Be Changed By Screen?
+			
+			gSource				No
+			cmsItem				No
+			
+			cmsRange				Yes
+			cmsScaleDistance		Yes
+			cmsScaleShip			Yes
+			cmsScaleStation		Yes
+			cmsMapCriteria		Yes
+			
+			cmsCursorX				Yes
+			corsorY				Yes
+			cmsCursorWidth			Yes
+			cmsCursorHeight		Yes
+			cmsXCursorNW			Yes
+			cmsYCursorNW			Yes
+			cmsXCursorNE			Yes
+			cmsYCursorNE			Yes
+			cmsXCursorSE			Yes
+			cmsYCursorSE			Yes
+			cmsXCursorSW			Yes
+			cmsYCursorSW			Yes
+			cmsShipList			Yes
+			cmsStationList		Yes
+			cmsExamineList		Yes
+			cmsSelectedList		Yes
+			
+			cmsShow
+			
+			cmsNextDesc
+			
+			cmsExamineObject		Yes
+			cmsSubordinateCriteria		Yes
+			cmsShipListNameFilter	Yes
+			cmsShipListNameFilterOriginal
+			cmsImmediate			Yes
+	-->
+	
+	<Globals>
+		(block Nil
+			(setq scnShowScreen (lambda (custom)
+				(scrShowScreen gScreen &dsCommandScreen; { custom:custom })
+				))
+			(setq scnSetDefaults (lambda Nil
+				(block Nil
+					(prnEventStart "Scanner Screen: Setting Defaults")
+					(setq cmsRange 2000)							;Default 500
+					(setq cmsScaleDistance 4)						;Default 4
+					(setq cmsScaleShip (* cmsScaleDistance 4))		;Default 16
+					(setq cmsScaleStation (* cmsScaleDistance 8))	;Default 32
+					
+					(setq cmsCursorSpeed 4)
+					
+					(setq cmsCursorX 300)
+					(setq cmsCursorY 200)
+					
+					(setq cmsCursorWidth 1)
+					(setq cmsCursorHeight 1)
+					
+					;Draw cursor as a hollow rectangle
+					(setq cmsXCursorNW 299)
+					(setq cmsYCursorNW 199)
+					
+					(setq cmsXCursorNE 301)
+					(setq cmsYCursorNE 199)
+					
+					(setq cmsXCursorSE 301)
+					(setq cmsYCursorSE 201)
+					
+					(setq cmsXCursorSW 299)
+					(setq cmsYCursorSW 201)
+					
+					(setq cmsSubordinateCriteria "sA S:d;")
+					
+					(setq cmsShow Nil)
+					
+					(setq cmsCenterX 300)
+					(setq cmsCenterY 200)
+					
+					(setq cmsOriginX 300)
+					(setq cmsOriginY 200)
+					
+					(scnInitializeObjects)
+					
+					(setq cmsShipListNameFilter Nil)
+					(prnEventEnd "Scanner Screen: Setting Defaults")
+					;	Ship List Entry Format
+					;	0.	[UNUSED] Highlighted
+					;	1.	Selected
+					;	2.	Image Center X
+					;	3.	Image Center Y
+					;	4.	Object
+					;	5.	Image Position X
+					;	6.	Image Position Y
+					;	7.	Image Width
+					;	8.	Image Height
+					;	9.	Image Color	
+					
+					;	Station List Entry Format
+					;	0.	[UNUSED] Highlighted
+					;	1.	Selected
+					;	2.	Image Center X
+					;	3.	Image Center Y
+					;	4.	Object
+					;	5.	North-West Corner X
+					;	6.	North-West Corner Y
+					;	7.	North-East Corner X
+					;	8.	North-East Corner Y
+					;	9.	South-East Corner X
+					;	10.	South-East Corner Y
+					;	11. South-West Corner X
+					;	12. South-West Corner Y
+					;	13. Color
+					)
+				))
+			(setq scnInitializeObjects (lambda Nil
+				(block
+					(
+						(image (objGetImageDesc gSource))
+						(width (/ (@ image 3) cmsScaleShip)) ;0-based index means 3 refers to the 4th element
+						(height (/ (@ image 4) cmsScaleShip)) ;0-based index means 4 refers to the 5th element
+						(xPosSource (- cmsOriginX (/ width 2)))
+						(yPosSource (- cmsOriginY (/ height 2)))
+						)
+					(setq cmsOriginPos (objGetPos gSource))	;This controls where the player is drawn on the map
+						
+					(prnEventStart "Scanner Screen: Initializing Objects")
+					;(cnvDrawImage xPos yPos image) ;Draws from the upper-left corner
+					
+					(setq cmsShipList Nil)
+					(setq cmsStationList Nil)
+					(setq cmsMarkerList Nil)
+					(setq cmsSelectedList Nil)
+					(setq cmsExamineList Nil)
+					
+					(setq cmsMapCriteria (cat "ts N:" cmsRange "; -uncharted;"))
+					
+					;Add all objects to draw list
+					(enum
+						(append (sysFindObject gSource cmsMapCriteria) (filter (sysFindObject Nil "k") theMarker (eq (objGetName theMarker "Command Marker"))))
+						object
+						(block	(
+									(image (objGetImageDesc object))
+									(disposition (objGetDisposition gSource object))
+									(pos (sysVectorSubtract (objGetPos object) cmsOriginPos))	;Relative to center (player by default)
+									(angle (sysVectorAngle pos))
+									(distance (/ (sysVectorDistance pos) cmsScaleDistance))
+									(xPosCenter (+ cmsOriginX (* (cos angle) distance)))
+									(yPosCenter (- cmsOriginY (* (sin angle) distance)))
+									(category (objGetProperty object 'category))
+									(color
+										(switch
+											(not (objCanAttack object))
+												'(0 0 255)	;Blue
+												
+											(eq disposition 'friend)
+												'(0 255 0)	;Green
+												
+											(eq disposition 'neutral)
+												'(255 255 0)	;Yellow
+											
+											(eq disposition 'enemy)
+												'(255 0 0)	;Red
+											)
+										)
+									)
+							
+							(switch
+								(eq category 'ship)
+									(block	(
+												(width (/ (@ image 3) cmsScaleShip))
+												(height (/ (@ image 4) cmsScaleShip))
+												(xPosImage (- xPosCenter (/ width 2)))
+												(yPosImage (- yPosCenter (/ height 2)))
+												)
+										(lnkAppend cmsShipList {
+											highlighted:	Nil
+											selected:		Nil
+											xPosCenter:		xPosCenter
+											yPosCenter:		yPosCenter
+											object:			object
+											xPosImage:		xPosImage
+											yPosImage:		yPosImage
+											width:			width
+											height:			height
+											color:			color
+											})
+										)
+										
+								(eq category 'station)
+									(block	(
+												(width (/ (@ image 3) cmsScaleStation))
+												(height (/ (@ image 4) cmsScaleStation))
+												(xRectNW (- xPosCenter width))
+												(yRectNW (- yPosCenter height))
+												(xRectNE (+ xPosCenter width))
+												(yRectNE yRectNW)
+												(xRectSE xRectNE)
+												(yRectSE (+ yPosCenter height))
+												(xRectSW xRectNW)
+												(yRectSW yRectSE)
+												)
+										(lnkAppend cmsStationList {
+											highlighted:	Nil
+											selected:		Nil
+											xPosCenter:		xPosCenter
+											yPosCenter:		yPosCenter
+											object:			object
+											xRectNW:		xRectNW
+											yRectNW:		yRectNW
+											xRectNE:		xRectNE
+											yRectNE:		yRectNE
+											xRectSE:		xRectSE
+											yRectSE:		yRectSE
+											xRectSW:		xRectSW
+											yRectSW:		yRectSW
+											color:			color
+											})
+										)
+								(eq category 'marker)
+									(lnkAppend cmsMarkerList {
+										highlighted:	Nil
+										selected:		Nil
+										xPosCenter:		xPosCenter
+										yPosCenter:		yPosCenter
+										object:			object
+										})
+								)
+							)
+						)
+						
+					;Add the player on the top layer
+					(lnkAppend cmsShipList {
+						highlighted:	Nil
+						selected:		Nil
+						xPosCenter:		cmsOriginX
+						yPosCenter:		cmsOriginY
+						object:			gSource
+						xPosImage:		xPosSource
+						yPosImage:		yPosSource
+						width:			width
+						height:			height
+						color:			'(255 255 255)
+						})
+					(prnEventEnd "Scanner Screen: Initializing Objects")
+					)
+				))
+			(setq scnDraw (lambda Nil
+				(block Nil
+					(print "Drawing Background")
+					(cnvDrawRect 0 0 600 500 '(0 0 0))
+					
+					(print "Drawing Stations")
+					(enum cmsStationList image
+						(block
+							(
+								(xNW (@ image 'xRectNW))
+								(yNW (@ image 'yRectNW))
+								
+								(xNE (@ image 'xRectNE))
+								(yNE (@ image 'yRectNE))
+								
+								(xSE (@ image 'xRectSE))
+								(ySE (@ image 'yRectSE))
+								
+								(xSW (@ image 'xRectSW))
+								(ySW (@ image 'yRectSW))
+								(color
+									(switch
+										<!--
+										(@ image 'selected) ;Selected
+										-->
+										(find cmsSelectedList (@ image 'object))
+											'(192 192 192)
+										<!--
+										(@ image 'highlighted) ;Highlighted
+											'(128 128 128)
+										-->
+										(setq color (@ image 'color))
+										)
+									)
+								)
+							(cnvDrawLine xNW yNW xNE yNE 1 color)
+							(cnvDrawLine xNE yNE xSE ySE 1 color)
+							(cnvDrawLine xSE ySE xSW ySW 1 color)
+							(cnvDrawLine xSW ySW xNW yNW 1 color)
+							)
+						)
+					(print "Drawing Ships")
+					(enum cmsShipList image
+						(block
+							(
+								(color
+									(switch
+										(@ image 'selected) ;Selected
+											'(192 192 192)
+											
+										(@ image 'highlighted) ;Highlighted
+											'(128 128 128)
+											
+										(@ image 'color)
+										)
+									)
+								)
+							(cnvDrawRect (@ image 'xPosImage) (@ image 'yPosImage) (@ image 'width) (@ image 'height) color)
+							)
+						)
+					(enum cmsMarkerList image
+						(block	(
+									(length 8)
+									(width 4)
+									(lengthHalf (/ length 2))
+									(widthHalf (/ width 2))
+									(xPos (@ image 'xPosCenter))
+									(yPos (@ image 'yPosCenter))
+									)
+							(cnvDrawRect (- xPos lengthHalf) (- yPos widthHalf) length width '(255 255 0))
+							(cnvDrawRect (- xPos widthHalf) (- yPos lengthHalf) width length '(255 255 0))
+							)
+						)
+					(print "Drawing Center")
+					(cnvDrawLine (- cmsCenterX 5) cmsCenterY (+ cmsCenterX 5) cmsCenterY 1 '(255 255 255)) ;Horizontal
+					(cnvDrawLine cmsCenterX (- cmsCenterY 5) cmsCenterX (+ cmsCenterY 5) 1 '(255 255 255)) ;Vertical
+						
+					(print "Drawing Cursor")
+					;Top (NW to NE)
+					(cnvDrawLine cmsXCursorNW cmsYCursorNW cmsXCursorNE cmsYCursorNE 1 '(0 255 255))
+					
+					;Right (NE to SE)
+					(cnvDrawLine cmsXCursorNE cmsYCursorNE cmsXCursorSE cmsYCursorSE 1 '(0 255 255))
+					
+					;Bottom (SE to SW)
+					(cnvDrawLine cmsXCursorSE cmsYCursorSE cmsXCursorSW cmsYCursorSW 1 '(0 255 255))
+					
+					;Left (SW to NW)
+					(cnvDrawLine cmsXCursorSW cmsYCursorSW cmsXCursorNW cmsYCursorNW 1 '(0 255 255))
+					)
+				))
+			<!--
+			;ONLY WORKS WITH DEFAULT PANE
+			(setq scrRefreshList (lambda (screen)
+				(block (index)
+					(setq index (scrGetListCursor gScreen))
+					(scrShowPane gScreen "Default")
+					(scrSetListCursor gScreen index)
+					)
+				))
+			-->
+
+			(setq scnGetCustomName (lambda (object)
+				(block
+					(
+						(name (objGetName object))
+						(customName (objGetData object "name_custom"))
+						)
+					(if customName
+						(setq name (cat name " \"" customName "\""))
+						)
+					(if (find cmsSelectedList object)
+						(setq name (cat name " (Selected)"))
+						)
+					name
+					)
+				))
+			(setq scnCancelSubordinateOrders (lambda Nil
+				(block Nil
+					(if cmsOrderSelected
+						(enum (filter cmsSelectedList theObject (objMatches theObject gSource cmsSubordinateCriteria)) theSubordinate
+							(shpCancelOrders theSubordinate)
+							)
+						(shpCancelOrders cmsShip)
+						)
+					(scrShowPane gScreen "Default")
+					)
+				))
+			(setq scnOrderSubordinates (lambda (order)
+				(block Nil
+					(if cmsOrderSelected
+						(if cmsImmediate
+							(enum (filter cmsSelectedList theObject (objMatches theObject gSource cmsSubordinateCriteria)) theSubordinate
+								(shpOrderImmediate theSubordinate order cmsExamineObject)
+								)
+							(enum (filter cmsSelectedList theObject (objMatches theObject gSource cmsSubordinateCriteria)) theSubordinate
+								(shpOrder theSubordinate order cmsExamineObject)
+								)
+							)
+						(if cmsImmediate
+							(shpOrderImmediate cmsShip order cmsExamineObject)
+							(shpOrder cmsShip order cmsExamineObject)
+							)
+						)
+					(scrShowPane gScreen "Default")
+					)
+				))
+			)
+	</Globals>
+	
+			<!--
+			(setq modNegative (lambda (dividend divisor)
+				(block (result)
+					(setq result (mod dividend divisor))
+					(if (ls result 0)
+						(+ divisor result)
+						result
+						)
+					)
+				))
+			-->
+	
+	<!-- ;VERSION 1 - USES IMAGES, DOESN'T WORK
+	<DockScreen UNID="&dsUseScannerScreen;"
+			name=				"Ship's Interior"
+			backgroundID=		"none"
+			>
+		<OnScreenInit>
+				(block (cmsCenterX cmsCenterY direction image width height xPos yPos)
+					(setq cmsOriginX 300)
+					(setq cmsOriginY 200)
+					
+					(setq cmsCursorX 300)
+					(setq cmsCursorY 200)
+					
+					(setq cmsCursorWidth 1)
+					(setq cmsCursorHeight 1)
+					
+					;Draw cursor as a hollow rectangle
+					(setq cmsXCursorNW 299)
+					(setq cmsYCursorNW 199)
+					
+					(setq cmsXCursorNE 301)
+					(setq cmsYCursorNE 199)
+					
+					(setq cmsXCursorSW 299)
+					(setq cmsYCursorSW 201)
+
+					(setq cmsXCursorSE 301)
+					(setq cmsYCursorSE 201)
+					
+					(setq direction (shpGetDirection gSource))
+					(setq image (shpGetImageDesc gSource direction))
+					(setq width (@ image 3)) ;0-based index means 3 refers to the 4th element
+					(setq height (@ image 4)) ;0-based index means 4 refers to the 5th element
+					(setq xPos (- cmsCenterX (/ width 2)))
+					(setq yPos (- cmsCenterY (/ height 2)))
+					;(cnvDrawImage xPos yPos image) ;Draws from the upper-left corner
+					
+					;Reset the draw list
+					(setq drawList Nil)
+					
+					;Add all objects to draw list
+					(enum (sysFindObject gSource "Tts N:500;") object
+						(block (image width height pos angle distance xPos yPos xPosCenter yPosCenter)
+							(if (objIsShip object)
+								(setq image (objGetImageDesc object (shpGetDirection object)))
+								(setq image (objGetImageDesc object))
+								)
+									
+							(setq width (@ image 3)) ;0-based index means 3 refers to the 4th element
+							(setq height (@ image 4)) ;0-based index means 4 refers to the 5th element
+							
+							(setq pos (sysVectorSubtract (objGetPos object) (objGetPos gSource))) ;Relative to player
+							(setq angle (sysVectorAngle pos))
+							(setq distance (sysVectorDistance pos))
+							
+							(setq xPosCenter (+ cmsCenterX (* (cos angle) distance)))
+							(setq yPosCenter (- cmsCenterY (* (sin angle) distance)))
+							
+							(setq xPos (- xPosCenter (/ width 2)))
+							(setq yPos (- yPosCenter (/ height 2)))
+							
+							
+							(lnkAppend drawList (list xPos yPos image xPosCenter yPosCenter object))
+							)
+						)
+						
+					;Add the player on the top layer
+					(lnkAppend drawList (list xPos yPos image cmsCenterX cmsCenterY gSource))
+					)
+		</OnScreenInit>
+			
+		<Display>
+			<Canvas>
+				(block Nil
+					(enum drawList image
+						(cnvDrawImage (@ image 0) (@ image 1) (@ image 2))
+						)
+					
+					;Top (NW to NE)
+					(cnvDrawLine cmsXCursorNW cmsYCursorNW cmsXCursorNE cmsYCursorNE 1 '(255 255 0))
+					
+					;Right (NE to SE)
+					(cnvDrawLine cmsXCursorNE cmsYCursorNE cmsXCursorSE cmsYCursorSE 1 '(255 255 0))
+					
+					;Bottom (SE to SW)
+					(cnvDrawLine cmsXCursorSE cmsYCursorSE cmsXCursorSW cmsYCursorSW 1 '(255 255 0))
+					
+					;Left (SW to NW)
+					(cnvDrawLine cmsXCursorSW cmsYCursorSW cmsXCursorNW cmsYCursorNW 1 '(255 255 0))
+					
+					)
+			</Canvas>
+		</Display>
+		<Panes>
+			<Default
+					showCounter=	"true"
+					>
+				<OnPaneInit>
+					(block (desc)
+						<!--
+						;Draw cursor as a hollow rectangle
+						(setq cmsXCursorNW (- cmsCursorX cmsCursorWidth))
+						(setq cmsYCursorNW (- cmsCursorY cmsCursorHeight))
+						
+						(setq cmsXCursorNE (+ cmsCursorX cmsCursorWidth))
+						(setq cmsYCursorNE (- cmsCursorY cmsCursorHeight))
+						
+						(setq cmsXCursorSW (- cmsCursorX cmsCursorWidth))
+						(setq cmsYCursorSW (+ cmsCursorY cmsCursorHeight))
+
+						(setq cmsXCursorSE (+ cmsCursorX cmsCursorWidth))
+						(setq cmsYCursorSE (+ cmsCursorY cmsCursorHeight))
+						--
+						(setq cmsExamineList Nil)
+						
+						;If any object has its center within the NW and SE corners, include it in the pane description
+						(enum drawList objectDesc
+							(block (xCenter yCenter object)
+								(setq xCenter (@ objectDesc 3))
+								(setq yCenter (@ objectDesc 4))
+								(setq object (@ objectDesc 5))
+								(if (and
+										(leq xCenter cmsXCursorSE) ;To the left of the SE Corner
+										(leq yCenter cmsYCursorSE) ;Above the SE Corner
+										(geq xCenter cmsXCursorNW) ;To the right of the NW Corner
+										(geq yCenter cmsYCursorNW) ;Below the NW Corner
+										)
+									(lnkAppend cmsExamineList object)
+									)
+								)
+							)
+						(if cmsExamineList
+							(block (objectCount)
+								(setq objectCount (count cmsExamineList))
+								(if (eq objectCount 1)
+									(setq desc (cat objectCount " object selected:\n"))
+									(setq desc (cat objectCount " objects selected:\n"))
+									)
+								(for i 0 (- objectCount 1)
+									(setq desc (cat desc (+ i 1) ". " (objGetName (@ cmsExamineList i) 0x04) "\n"))
+									)
+								(setq desc (cat desc "\nIn the counter below, enter the number of the object that you would like to examine."))
+								(scrEnableAction gScreen 0 True)
+								)
+							(block Nil
+								(setq desc "No objects selected.")
+								(scrEnableAction gScreen 0 Nil)
+								)
+							)
+						(scrSetDesc gScreen desc)
+						)
+				</OnPaneInit>
+				<Actions>
+					<Action name="Examine Object" key="E" default="1">
+						(block (counter)
+							(setq counter (scrGetCounter gScreen))
+							(scrSetDesc gScreen (cat "Examining object #" counter ": " (objGetName (@ cmsExamineList (- counter 1)) 0x04)))
+							)
+					</Action>
+				
+					;ADD CURSOR TO CANVAS
+					<Action name="W - Move Cursor Up" key="W">
+						<!--
+						(setq cmsCursorY (- cmsCursorY 1))
+						--
+						
+						(block Nil
+							(setq cmsYCursorNE (- cmsYCursorNE 1))
+							(setq cmsYCursorNW (- cmsYCursorNW 1))
+							(setq cmsYCursorSE (- cmsYCursorSE 1))
+							(setq cmsYCursorSW (- cmsYCursorSW 1))
+							
+							;Update the examine pane
+							(scrShowPane gScreen "Default")
+							)
+					</Action>
+					<Action name="S - Move Cursor Down" key="S">
+						<!--
+						(setq cmsCursorY (+ cmsCursorY 1))
+						--
+						
+						(block Nil
+							(setq cmsYCursorNE (+ cmsYCursorNE 1))
+							(setq cmsYCursorNW (+ cmsYCursorNW 1))
+							(setq cmsYCursorSE (+ cmsYCursorSE 1))
+							(setq cmsYCursorSW (+ cmsYCursorSW 1))
+							
+							;Update the examine pane
+							(scrShowPane gScreen "Default")
+							)
+					</Action>
+					<Action name="A - Move Cursor Left" key="A">
+						<!--
+						(setq cmsCursorX (- cmsCursorX 1))
+						--
+						
+						(block Nil
+							(setq cmsXCursorNE (- cmsXCursorNE 1))
+							(setq cmsXCursorNW (- cmsXCursorNW 1))
+							(setq cmsXCursorSE (- cmsXCursorSE 1))
+							(setq cmsXCursorSW (- cmsXCursorSW 1))
+							
+							;Update the examine pane
+							(scrShowPane gScreen "Default")
+							)
+					</Action>
+					<Action name="D - Move Cursor Right" key="D">
+						<!--
+						(setq cmsCursorX (+ cmsCursorX 1))
+						--
+						
+						(block Nil
+							(setq cmsXCursorNE (+ cmsXCursorNE 1))
+							(setq cmsXCursorNW (+ cmsXCursorNW 1))
+							(setq cmsXCursorSE (+ cmsXCursorSE 1))
+							(setq cmsXCursorSW (+ cmsXCursorSW 1))
+							
+							;Update the examine pane
+							(scrShowPane gScreen "Default")
+							)
+					</Action>
+					
+					<Action name="I - Increase Cursor Height" key="I">
+						<!--
+						(setq cmsCursorHeight (+ cmsCursorHeight 1))
+						--
+						
+						(block Nil
+							(setq cmsCursorHeight (+ cmsCursorHeight 1))
+							
+							(setq cmsYCursorNW (- cmsYCursorNW 1))
+							(setq cmsYCursorNE (- cmsYCursorNE 1))
+							
+							(setq cmsYCursorSW (+ cmsYCursorSW 1))
+							(setq cmsYCursorSE (+ cmsYCursorSE 1))
+							
+							;Update the examine pane
+							(scrShowPane gScreen "Default")
+							)
+					</Action>
+					<Action name="K - Decrease Cursor Height" key="K">
+						(if (gr cmsCursorHeight 1)
+							<!--
+							(setq cmsCursorHeight (- cmsCursorHeight 1))
+							--
+							(block Nil
+								(setq cmsCursorHeight (- cmsCursorHeight 1))
+								
+								(setq cmsYCursorNW (+ cmsYCursorNW 1))
+								(setq cmsYCursorNE (+ cmsYCursorNE 1))
+								
+								(setq cmsYCursorSW (- cmsYCursorSW 1))
+								(setq cmsYCursorSE (- cmsYCursorSE 1))
+								
+								;Update the examine pane
+								(scrShowPane gScreen "Default")
+								)
+							)
+					</Action>
+					<Action name="L - Increase Cursor Width" key="L">
+						<!--
+						(setq cmsCursorWidth (+ cmsCursorWidth 1))
+						--
+						
+						(block Nil
+							(setq cmsCursorWidth (+ cmsCursorWidth 1))
+							
+							(setq cmsXCursorNE (+ cmsXCursorNE 1))
+							(setq cmsXCursorSE (+ cmsXCursorSE 1))
+							(setq cmsXCursorNW (- cmsXCursorNW 1))
+							(setq cmsXCursorSW (- cmsXCursorSW 1))
+							
+							;Update the examine pane
+							(scrShowPane gScreen "Default")
+							)
+					</Action>
+					<Action name="J - Decrease Cursor Width" key="J">
+						(if (gr cmsCursorWidth 1)
+							<!--
+							(setq cmsCursorWidth (- cmsCursorWidth 1))
+							--
+							
+							(block Nil
+								(setq cmsCursorWidth (- cmsCursorWidth 1))
+								
+								(setq cmsXCursorNE (- cmsXCursorNE 1))
+								(setq cmsXCursorSE (- cmsXCursorSE 1))
+								(setq cmsXCursorNW (+ cmsXCursorNW 1))
+								(setq cmsXCursorSW (+ cmsXCursorSW 1))
+								
+								;Update the examine pane
+								(scrShowPane gScreen "Default")
+								)
+							)
+					</Action>
+					
+					
+					<Action name="Finish" cancel="1" key="F">
+						<Exit/>
+					</Action>
+				</Actions>
+			</Default>
+		</Panes>
+	</DockScreen>
+	-->
+	
+	<!-- ;VERSION 2; USES RECTANGLES, SUBPAR
+	<DockScreen UNID="&dsUseScannerScreen;"
+			name=				"Ship's Interior"
+			backgroundID=		"none"
+			>
+		<OnScreenInit>
+				(block (cmsCenterX cmsCenterY scale direction image width height xPos yPos)
+					(setq cmsOriginX 300)
+					(setq cmsOriginY 200)
+					(setq scale 4) ;Scale-down factor
+					
+					(setq cmsCursorX 300)
+					(setq cmsCursorY 200)
+					
+					(setq cmsCursorWidth 1)
+					(setq cmsCursorHeight 1)
+					
+					;Draw cursor as a hollow rectangle
+					(setq cmsXCursorNW 299)
+					(setq cmsYCursorNW 199)
+					
+					(setq cmsXCursorNE 301)
+					(setq cmsYCursorNE 199)
+					
+					(setq cmsXCursorSW 299)
+					(setq cmsYCursorSW 201)
+
+					(setq cmsXCursorSE 301)
+					(setq cmsYCursorSE 201)
+					
+					(setq width (/ (@ image 3) scale)) ;0-based index means 3 refers to the 4th element
+					(setq height (/ (@ image 4) scale)) ;0-based index means 4 refers to the 5th element
+					(setq xPos (- cmsCenterX (/ width 2)))
+					(setq yPos (- cmsCenterY (/ height 2)))
+					;(cnvDrawImage xPos yPos image) ;Draws from the upper-left corner
+					
+					;Reset the draw list
+					(setq drawList Nil)
+					
+					;Add all objects to draw list
+					(enum (sysFindObject gSource "Tts N:500;") object
+						(block (image width height disposition color pos angle distance xPos yPos xPosCenter yPosCenter)
+							(setq image (objGetImageDesc object))
+							
+							(setq width (/ (@ image 3) scale)) ;Scale down by 4
+							(setq height (/ (@ image 4) scale)) ;Scale down by 4
+							
+							(setq pos (sysVectorSubtract (objGetPos object) (objGetPos gSource))) ;Relative to player
+							(setq angle (sysVectorAngle pos))
+							(setq distance (sysVectorDistance pos))
+							
+							(setq xPosCenter (+ cmsCenterX (* (cos angle) distance)))
+							(setq yPosCenter (- cmsCenterY (* (sin angle) distance)))
+							
+							(setq xPos (- xPosCenter (/ width 2)))
+							(setq yPos (- yPosCenter (/ height 2)))
+							
+							(setq disposition (objGetDisposition gSource object))
+							(switch
+								(eq disposition 'friend)
+									(setq color '(0 255 0))
+									
+								(eq disposition 'neutral)
+									(setq color '(255 255 0))
+								
+								(eq disposition 'enemy)
+									(setq color '(255 0 0))
+								)
+							(lnkAppend drawList (list xPos yPos width height color xPosCenter yPosCenter object))
+							)
+						)
+						
+					;Add the player on the top layer
+					(lnkAppend drawList (list xPos yPos width height '(255 255 255) cmsCenterX cmsCenterY gSource))
+					)
+		</OnScreenInit>
+			
+		<Display>
+			<Canvas>
+				(block Nil
+					(enum drawList image
+						(cnvDrawRect (@ image 0) (@ image 1) (@ image 2) (@ image 3) (@ image 4))
+						)
+					
+					;Top (NW to NE)
+					(cnvDrawLine cmsXCursorNW cmsYCursorNW cmsXCursorNE cmsYCursorNE 1 '(0 255 255))
+					
+					;Right (NE to SE)
+					(cnvDrawLine cmsXCursorNE cmsYCursorNE cmsXCursorSE cmsYCursorSE 1 '(0 255 255))
+					
+					;Bottom (SE to SW)
+					(cnvDrawLine cmsXCursorSE cmsYCursorSE cmsXCursorSW cmsYCursorSW 1 '(0 255 255))
+					
+					;Left (SW to NW)
+					(cnvDrawLine cmsXCursorSW cmsYCursorSW cmsXCursorNW cmsYCursorNW 1 '(0 255 255))
+					
+					)
+			</Canvas>
+		</Display>
+		<Panes>
+			<Default
+					showCounter=	"true"
+					>
+				<OnPaneInit>
+					(block (desc)
+						<!--
+						;Draw cursor as a hollow rectangle
+						(setq cmsXCursorNW (- cmsCursorX cmsCursorWidth))
+						(setq cmsYCursorNW (- cmsCursorY cmsCursorHeight))
+						
+						(setq cmsXCursorNE (+ cmsCursorX cmsCursorWidth))
+						(setq cmsYCursorNE (- cmsCursorY cmsCursorHeight))
+						
+						(setq cmsXCursorSW (- cmsCursorX cmsCursorWidth))
+						(setq cmsYCursorSW (+ cmsCursorY cmsCursorHeight))
+
+						(setq cmsXCursorSE (+ cmsCursorX cmsCursorWidth))
+						(setq cmsYCursorSE (+ cmsCursorY cmsCursorHeight))
+						--
+						(setq cmsExamineList Nil)
+						
+						;If any object has its center within the NW and SE corners, include it in the pane description
+						(enum drawList objectDesc
+							(block (xCenter yCenter object)
+								(setq xCenter (@ objectDesc 5))
+								(setq yCenter (@ objectDesc 6))
+								(setq object (@ objectDesc 7))
+								(if (and
+										(leq xCenter cmsXCursorSE) ;To the left of the SE Corner
+										(leq yCenter cmsYCursorSE) ;Above the SE Corner
+										(geq xCenter cmsXCursorNW) ;To the right of the NW Corner
+										(geq yCenter cmsYCursorNW) ;Below the NW Corner
+										)
+									(lnkAppend cmsExamineList object)
+									)
+								)
+							)
+						(if cmsExamineList
+							(block (objectCount)
+								(setq objectCount (count cmsExamineList))
+								(if (eq objectCount 1)
+									(setq desc (cat objectCount " object selected:\n"))
+									(setq desc (cat objectCount " objects selected:\n"))
+									)
+								(for i 0 (- objectCount 1)
+									(setq desc (cat desc (+ i 1) ". " (objGetName (@ cmsExamineList i) 0x04) "\n"))
+									)
+								(setq desc (cat desc "\nIn the counter below, enter the number of the object that you would like to examine."))
+								(scrEnableAction gScreen 0 True)
+								)
+							(block Nil
+								(setq desc "No objects selected.")
+								(scrEnableAction gScreen 0 Nil)
+								)
+							)
+						(scrSetDesc gScreen desc)
+						)
+				</OnPaneInit>
+				<Actions>
+					<Action name="Examine Object" key="E" default="1">
+						(block (counter)
+							(setq counter (scrGetCounter gScreen))
+							(scrSetDesc gScreen (cat "Examining object #" counter ": " (objGetName (@ cmsExamineList (- counter 1)) 0x04)))
+							)
+					</Action>
+				
+					;ADD CURSOR TO CANVAS
+					<Action name="W - Move Cursor Up" key="W">
+						<!--
+						(setq cmsCursorY (- cmsCursorY 1))
+						--
+						
+						(block Nil
+							(setq cmsYCursorNE (- cmsYCursorNE 1))
+							(setq cmsYCursorNW (- cmsYCursorNW 1))
+							(setq cmsYCursorSE (- cmsYCursorSE 1))
+							(setq cmsYCursorSW (- cmsYCursorSW 1))
+							
+							;Update the examine pane
+							(scrShowPane gScreen "Default")
+							)
+					</Action>
+					<Action name="S - Move Cursor Down" key="S">
+						<!--
+						(setq cmsCursorY (+ cmsCursorY 1))
+						--
+						
+						(block Nil
+							(setq cmsYCursorNE (+ cmsYCursorNE 1))
+							(setq cmsYCursorNW (+ cmsYCursorNW 1))
+							(setq cmsYCursorSE (+ cmsYCursorSE 1))
+							(setq cmsYCursorSW (+ cmsYCursorSW 1))
+							
+							;Update the examine pane
+							(scrShowPane gScreen "Default")
+							)
+					</Action>
+					<Action name="A - Move Cursor Left" key="A">
+						<!--
+						(setq cmsCursorX (- cmsCursorX 1))
+						--
+						
+						(block Nil
+							(setq cmsXCursorNE (- cmsXCursorNE 1))
+							(setq cmsXCursorNW (- cmsXCursorNW 1))
+							(setq cmsXCursorSE (- cmsXCursorSE 1))
+							(setq cmsXCursorSW (- cmsXCursorSW 1))
+							
+							;Update the examine pane
+							(scrShowPane gScreen "Default")
+							)
+					</Action>
+					<Action name="D - Move Cursor Right" key="D">
+						<!--
+						(setq cmsCursorX (+ cmsCursorX 1))
+						--
+						
+						(block Nil
+							(setq cmsXCursorNE (+ cmsXCursorNE 1))
+							(setq cmsXCursorNW (+ cmsXCursorNW 1))
+							(setq cmsXCursorSE (+ cmsXCursorSE 1))
+							(setq cmsXCursorSW (+ cmsXCursorSW 1))
+							
+							;Update the examine pane
+							(scrShowPane gScreen "Default")
+							)
+					</Action>
+					
+					<Action name="I - Increase Cursor Height" key="I">
+						<!--
+						(setq cmsCursorHeight (+ cmsCursorHeight 1))
+						--
+						
+						(block Nil
+							(setq cmsCursorHeight (+ cmsCursorHeight 1))
+							
+							(setq cmsYCursorNW (- cmsYCursorNW 1))
+							(setq cmsYCursorNE (- cmsYCursorNE 1))
+							
+							(setq cmsYCursorSW (+ cmsYCursorSW 1))
+							(setq cmsYCursorSE (+ cmsYCursorSE 1))
+							
+							;Update the examine pane
+							(scrShowPane gScreen "Default")
+							)
+					</Action>
+					<Action name="K - Decrease Cursor Height" key="K">
+						(if (gr cmsCursorHeight 1)
+							<!--
+							(setq cmsCursorHeight (- cmsCursorHeight 1))
+							--
+							(block Nil
+								(setq cmsCursorHeight (- cmsCursorHeight 1))
+								
+								(setq cmsYCursorNW (+ cmsYCursorNW 1))
+								(setq cmsYCursorNE (+ cmsYCursorNE 1))
+								
+								(setq cmsYCursorSW (- cmsYCursorSW 1))
+								(setq cmsYCursorSE (- cmsYCursorSE 1))
+								
+								;Update the examine pane
+								(scrShowPane gScreen "Default")
+								)
+							)
+					</Action>
+					<Action name="L - Increase Cursor Width" key="L">
+						<!--
+						(setq cmsCursorWidth (+ cmsCursorWidth 1))
+						--
+						
+						(block Nil
+							(setq cmsCursorWidth (+ cmsCursorWidth 1))
+							
+							(setq cmsXCursorNE (+ cmsXCursorNE 1))
+							(setq cmsXCursorSE (+ cmsXCursorSE 1))
+							(setq cmsXCursorNW (- cmsXCursorNW 1))
+							(setq cmsXCursorSW (- cmsXCursorSW 1))
+							
+							;Update the examine pane
+							(scrShowPane gScreen "Default")
+							)
+					</Action>
+					<Action name="J - Decrease Cursor Width" key="J">
+						(if (gr cmsCursorWidth 1)
+							<!--
+							(setq cmsCursorWidth (- cmsCursorWidth 1))
+							--
+							
+							(block Nil
+								(setq cmsCursorWidth (- cmsCursorWidth 1))
+								
+								(setq cmsXCursorNE (- cmsXCursorNE 1))
+								(setq cmsXCursorSE (- cmsXCursorSE 1))
+								(setq cmsXCursorNW (+ cmsXCursorNW 1))
+								(setq cmsXCursorSW (+ cmsXCursorSW 1))
+								
+								;Update the examine pane
+								(scrShowPane gScreen "Default")
+								)
+							)
+					</Action>
+					
+					
+					<Action name="Finish" cancel="1" key="F">
+						<Exit/>
+					</Action>
+				</Actions>
+			</Default>
+		</Panes>
+	</DockScreen>
+	-->
+</TranscendenceLibrary>

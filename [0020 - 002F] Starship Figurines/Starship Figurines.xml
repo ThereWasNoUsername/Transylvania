@@ -1,0 +1,362 @@
+<?xml version="1.0" encoding="utf-8"?>
+
+<!DOCTYPE TranscendenceExtension
+[
+	<!--	CUSTOM	ENTITIES	-->
+	<!ENTITY unidExtension					"0xa0130020">
+	<!ENTITY unidStarshipFigurine			"0xa0130021">
+	<!ENTITY dsUseShipFigurine				"0xa0130022">
+]>
+
+<TranscendenceExtension UNID="&unidExtension;" name="Starship Figurines" version="1.0" credits="0xABCDEF/Archcannon">
+<!--
+*All ship masses are decreased by 10 (literal number) or scaled down by 100 (actual units)
+*All item masses are decreased by 100
+-->
+<!--
+	<!ENTITY itSapphireFigurine				"0xED6E0032">
+	<!ENTITY itClass1DeflectorReplica		"0xED6E0033">
+	<!ENTITY it15MWReactorReplica			"0xED6E0034">
+	<!ENTITY itRecoillessCannonReplica		"0xED6E0035">
+	<!ENTITY dsCustomizeFigurine			"0xED6E0036">
+	<!ENTITY dsUseShipFigurine				"0xED6E0037">
+	<!ENTITY dsUseItemFigurine				"0xED6E0038">
+	
+	;useScreen=			"&dsUseShipFigurine;"
+	
+						<GetTradePrice>
+							(+ (itmGetPrice gItem) (apply + (map (itmGetData gItem "items") theItem (* (itmGetPrice theItem) (itmGetCount theItem)))))
+						</GetTradePrice>
+-->
+	<Type UNID="&unidStarshipFigurine;">
+		<StaticData>
+			<ShipFigurine><![CDATA[<ItemType
+					name=				"figurine(s) of a %name%"
+					level=				"1"
+					value=				"0"
+					mass=				"1"
+					frequency=			"common"
+					attributes=			"StarshipFigurine"
+					
+					useScreen=			"%useScreen%"
+
+					charges=			"-1"
+					massBonusPerCharge=	"1"
+					
+					description=		"These realistic, 3D-printed starship figurines are highly customizable with other figurines."
+					>
+					<Image imageID="%image%" imageX="288" imageY="0" imageWidth="96" imageHeight="96"/>
+					<StaticData>
+						<Data id="sourceType">%sourceType%</Data>
+					</StaticData>
+				</ItemType>]]>
+			</ShipFigurine>
+			<ItemReplica><![CDATA[<ItemType
+					name=				"replica(s) of a %name%"
+					level=				"1"
+					value=				"0"
+					mass=				"1"
+					frequency=			"common"
+					attributes=			"ItemReplica"
+					
+					charges=			"-1"
+					massBonusPerCharge=	"1"
+					
+					description=		"This replica item can be attached to a starship figurine."
+					>
+					<Image imageID="%image%" imageX="288" imageY="0" imageWidth="96" imageHeight="96"/>
+					<StaticData>
+						<Data id="sourceType">%sourceType%</Data>
+					</StaticData>
+				</ItemType>]]>
+			</ItemReplica>
+		</StaticData>
+		<Events>
+			<!--
+			<OnGlobalTypesInit>
+				(block
+					(
+						theItemTypeList
+						theShipClassList
+						)
+					(enum (typFind "*") theType
+						(errBlock
+							(
+								theError
+								theXML
+								theTag
+								theEntry
+								)
+							
+							(switch
+								;If we can't get all the way without causing an error, then stop
+								(not
+									(and
+										theType										;If this type does not exist, STOP
+										(setq theXML (typGetXML theType))			;If this type does not have an XML, STOP
+										(not (isError theError))					;If we got here using an error, STOP NOW!
+										(setq theTag (xmlGetTag theXML))
+										(setq theEntry {type:theType xml:theXML})
+										)
+									)
+									Nil
+									
+								(eq theTag 'ItemType)
+									(lnkAppend theItemTypeList theEntry)
+									
+								(eq theTag 'ShipClass)
+									(lnkAppend theShipClassList theEntry)
+								)
+							)
+						)
+					(enum theItemTypeList theEntry
+						(block
+							(
+								(theType (@ theEntry 'type))
+								(theXML (@ theEntry 'xml))
+								(theReplicaType (typDynamicUNID (cat "replica(s) of a " (xmlGetAttrib theXML 'name))))
+								(theReplicaXML (typGetStaticData 'ItemReplica)) ;xmlCreate creates a separate pointer so that two xml variables do not interfere with each other
+								)
+							(typCreate theType theXML)
+							(typCreate theReplicaType theReplicaXML)
+							)
+						)
+					(enum theShipClassList theEntry
+						(block
+							
+							)
+						)
+					)
+			</OnGlobalTypesInit>
+			-->
+			<OnGlobalUniverseCreated>
+				(block Nil
+					(enum (itmGetTypes "d") theItemType
+						(createReplica theItemType)
+						)
+					(enum (typFind "s") theShipClass	
+						(createFigurine theShipClass)
+						)
+					)
+			</OnGlobalUniverseCreated>
+			<OnGlobalObjDestroyed>
+				(if (and aWreckObj (objIsShip aObjDestroyed))
+					(block	(
+								(figurine (itmCreate (typDynamicUNID (cat "figurine of " (objGetType aObjDestroyed))) 1))
+								(mass 0)
+								)
+						(setq figurine (itmSetData figurine 'items
+							(map (objGetItems aObjDestroyed "d") theDevice
+								(block Nil
+									(setq mass (+ mass (itmGetMass theDevice)))
+									(itmCreate (typDynamicUNID (cat "replica of " (itmGetType theDevice))) 1)
+									)
+								)
+							))
+						(setq figurine (itmSetData figurine 'charges mass))
+						(objAddItem aWreckObj figurine)
+						)
+					)
+			</OnGlobalObjDestroyed>
+		</Events>
+		<AttributeDesc>
+			<ItemAttribute	label="Starship Figurine"	criteria="* +StarshipFigurine;"/>
+			<ItemAttribute	label="Item Replica"		criteria="* +ItemReplica;"/>
+		</AttributeDesc>
+	</Type>
+	<DockScreen UNID="&dsUseShipFigurine;"
+		name=		"=(itmGetName gItem 0x0100)"
+		type=		"customPicker"
+		nestedScreen=	"true"
+		>
+		<List	rowHeight="48">
+			(map (itmGetData gItem 'items) theItem
+				{
+					title:	(itmGetName theItem 0x0100)
+					desc:	(itmGetProperty theItem 'description)
+					icon:	(itmGetImageDesc theItem)
+					}
+				)
+		</List>
+		<Panes>
+			<Default>
+				<OnPaneInit>
+					(scrSetDesc gScreen (cat "You are inspecting a " (itmGetName gItem 0x0100)))
+				</OnPaneInit>
+				<Actions>
+					<Action	name="Done"	key="D"	default="1"	cancel="1">
+						<Exit/>
+					</Action>
+				</Actions>
+			</Default>
+		</Panes>
+	</DockScreen>
+	<Globals>
+		(block Nil
+			(setq createFigurine (lambda (shipClass)
+				(block 	(
+							(name (typGetProperty shipClass 'name))
+							(unid (typDynamicUNID (cat "figurine of " shipClass)))
+							(xml (subst (typGetStaticData &unidStarshipFigurine; 'ShipFigurine) {
+								name:			name
+								useScreen:		&dsUseShipFigurine;
+								image:			&rsItems1;
+								sourceType:		shipClass
+								}))
+							)
+					(printTo 'log xml)
+					(printTo 'console xml)
+					(typCreate unid (xmlCreate xml))
+					)
+				))
+			(setq createReplica (lambda (itemType)
+				(block 	(
+							(name (itmGetName itemType 0x0100))
+							(unid (typDynamicUNID (cat "replica of " itemType)))
+							(xml (subst (typGetStaticData &unidStarshipFigurine; 'ItemReplica) {
+								name:			name
+								image:			&rsItems1;
+								sourceType:		itemType
+								}))
+							)
+					(printTo 'log xml)
+					(printTo 'console xml)
+					(typCreate unid (xmlCreate xml))
+					)
+				))
+			)
+	</Globals>
+	<!-- Sapphire Figurine -->
+	<!--
+	<ItemType UNID="&itSapphireFigurine;"
+			name=				"figurine(s) of a Sapphire-class yacht"
+			level=				"1"
+			value=				"1"
+			mass=				"300"
+			frequency=			"common"
+			attributes=			"Lux; StarshipFigurine"
+
+			charges=			"0"
+			valueCharges=		"true"
+			
+			useScreen=			"&dsUseShipFigurine;"
+			
+			description=		"These realistic, 3D-printed starship figurines are highly customizable with other figurines."
+			>
+		<StaticData>
+			<manufacturer>"Zubrin Systems"</manufacturer>
+			
+			<size>31</size>
+			<mass>30</mass>
+			<thrustRatio>6.6</thrustRatio>
+			<maxSpeed>20</maxSpeed>
+			<cargoSpace>50</cargoSpace>
+			
+			<reactorPower>150</reactorPower>
+			<maxFuel>37500</maxFuel>
+			<maxArmor>6000</maxArmor>
+			<maxCargoSpace>150</maxCargoSpace>
+			<maxDevices>8</maxDevices>
+			
+			<armorCount>4</armorCount>
+			
+			<maneuverability>30</maneuverability>
+			
+			
+			<initialDevices>("replica(s) of a recoilless cannon" "replica(s) of a class I deflector" "replica(s) of a Nova-15 reactor")</initialDevices>
+			<initialArmor>"replica(s) of a [segment(s) of ]light ceramic armor"</initialArmor>
+		</StaticData>
+		<Image imageID="&rsItems1;" imageX="288" imageY="0" imageWidth="96" imageHeight="96"/>
+	</ItemType>
+	
+	<!-- Recoilless Cannon Replica --
+
+	<ItemType UNID="&itRecoillessCannonReplica;"
+			name=				"replica(s) of a recoilless cannon"
+			level=				"1"
+			value=				"1"
+			mass=				"25"
+			frequency=			"common"
+			attributes=			"Lux; WeaponReplica"
+			
+			description=		"This replica weapon can be attached to any compatible starship figurine."
+			>
+		<Image imageID="&rsItems1;" imageX="288" imageY="0" imageWidth="96" imageHeight="96"/>
+	</ItemType>
+	
+	<ItemType UNID="&itClass1DeflectorReplica;"
+			name=				"replica(s) of a class I deflector"
+			level=				"1"
+			value=				"1"
+			mass=				"10"
+			frequency=			"common"
+			attributes=			"Lux; ShieldReplica"
+			
+			description=		"This replica shield shield generator can be attached to any compatible starship figurine."
+			>
+		<Image imageID="&rsItems1;" imageX="288" imageY="0" imageWidth="96" imageHeight="96"/>
+	</ItemType>
+	
+	<ItemType UNID="&it15MWReactorReplica;"
+			name=				"replica(s) of a Nova-15 reactor"
+			level=				"1"
+			value=				"1"
+			mass=				"10"
+			frequency=			"common"
+			attributes=			"Lux; ReactorReplica"
+			
+			description=		"This replica reactor can be attached to any compatible starship figurine."
+			>
+		<Image imageID="&rsItems1;" imageX="288" imageY="0" imageWidth="96" imageHeight="96"/>
+	</ItemType>
+	
+	<DockScreen UNID="&dsUseShipFigurine;"
+			name=				"Ship's Interior"
+			>
+			
+		<Panes>
+			<Default>
+				<OnPaneInit>
+					(if (not (itmGetData gItem "description"))
+						(block (desc manufacturer size mass thrustRatio maxSpeed cargoSpace maxArmor maxCargoSpace maxDevices)
+							(setq desc "Figurine Info\n")
+							(if (setq manufacturer (itmGetData gItem "manufacturer"))
+								(setq desc (cat desc "Manufacturer: " manufacturer))
+								)
+							
+							;Add initial devices
+							
+							)
+						)
+				</OnPaneInit>
+
+				<Actions>
+					<Action id="attachParts" key="A">
+						(block Nil
+							(setq gTitle (useRepairArmor gItem gArmorSegment))
+							(scrShowPane gScreen "Done")
+							)
+					</Action>
+					
+					<Action id="removeParts" key="R">
+						(block Nil
+							(setq gTitle (useRepairArmor gItem gArmorSegment))
+							(scrShowPane gScreen "Done")
+							)
+					</Action>
+
+					<Action name="Done" cancel="1" key="C">
+						<Exit/>
+					</Action>
+					
+				</Actions>
+			</Default>
+		</Panes>
+		
+		<Language>
+			<Text id="attachParts">"[A]ttach Parts"</Text>
+			<Text id="removeParts">"[R]emove Parts"</Text>
+		</Language>
+	</DockScreen>
+	-->
+</TranscendenceExtension>

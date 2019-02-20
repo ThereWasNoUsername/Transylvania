@@ -1,0 +1,605 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!DOCTYPE TranscendenceExtension
+[	
+	<!--	CUSTOM	ENTITIES	-->
+	<!ENTITY unidTypehack		"0xA0130030">
+	<!ENTITY dsTypehack			"0xA0130031">
+]>
+<TranscendenceExtension UNID="&unidTypehack;" name="Typehack" debugOnly="true" apiVersion="35" version="1.0" credits="0xABCDEF (Game &amp; Forum) / Archcannon (IRC &amp; Xelerus)">
+<!--
+	gType
+	gXML
+	gSelectedElement
+	gAttributeName
+	gIndexPath
+	gYOffset
+-->
+<!--
+	<Power UNID="&pwTypehack;"
+			name=		"Typehack"
+			attributes=	""
+			key=		"H"
+			nestedScreen="true"
+			>
+
+		<OnShow>
+			True
+		</OnShow>
+
+		<OnInvokedByPlayer>
+			True
+		</OnInvokedByPlayer>
+
+		<Invoke>
+			(typehackXML)
+		</Invoke>
+	</Power>
+	-->
+
+	<DockScreen UNID="&dsTypehack;"
+			name=				"Typehack"
+			backgroundID=		"none"
+			>
+		<Display>
+			<Canvas>
+				(block	(
+							(xStart 14)
+							(yStart 10)
+							(size 14)
+							(tabs (lambda (n)
+								(block	(
+											(result "")
+											)
+									(for i 1 n
+										(setq result (cat result "\t"))
+										)
+									result
+									)
+								))
+							<!--
+							(lines (split (xmlFormat gXML "\t") "\n"))
+							-->
+							)
+					(cnvDrawRect 0 0 600 600 '(0 0 0))
+					<!--
+					(for i 0 (count lines)
+						(cnvDrawText
+							xStart
+							(+ yStart gYOffset (* size i))
+							-1
+							(cat i "\t" (@ lines i))
+							"Console"
+							'(255 255 255)
+							'left
+							)
+						)
+					-->
+					(cnvDrawText
+						xStart
+						yStart
+						-1
+						(xmlFormat gXML)
+						"Console"
+						'(255 255 255)
+						'left
+						)
+					)
+			</Canvas>
+		</Display>
+		<Panes>
+			<Default>
+				<OnPaneInit>
+					(block	(
+								(desc "")
+								(currentElement gXML)
+								)
+						(setq desc (cat desc (xmlGetTag gXML)))
+						(for i 0 (- (count gIndexPath) 1)
+							(block ((elementIndex (@ gIndexPath i)))
+								(setq currentElement (xmlGetSubElement currentElement elementIndex))
+								
+								(setq desc (cat desc "\n"))
+								(for j 0 i
+									(setq desc (cat desc "-"))
+									)
+								(setq desc (cat desc "[" elementIndex "]" " " (xmlGetTag currentElement)))
+								)
+							)
+						(scrSetDesc gScreen desc)
+						;Don't enable Select/Delete Subelements if there are no subelements to select
+						(scrEnableAction gScreen 'actionSelectSubelement (gr (xmlGetSubElementCount gSelectedElement) 0))
+						(scrEnableAction gScreen 'actionDeleteSubelement (gr (xmlGetSubElementCount gSelectedElement) 0))
+						
+						;Don't enable Parent if the current element doesn't have one
+						(scrEnableAction gScreen 'actionParent (gr (count gIndexPath) 0))
+						)
+				</OnPaneInit>
+				<Actions>
+					<Action id="actionScrollUp">
+						(if (ls gYOffset 0)
+							(setq gYOffset (+ gYOffset 14))
+							)
+					</Action>
+					<Action id="actionScrollDown">
+						(if (gr gYOffset (* -14 (count (split (xmlFormat gXML "\t") "\n"))))
+							(setq gYOffset (- gYOffset 14))
+							)
+					</Action>
+					<Action id="actionParent">
+						(block Nil
+							(lnkRemove gIndexPath (- (count gIndexPath) 1))
+							(setq gSelectedElement gXML)
+							(enum gIndexPath theIndex
+								(setq gSelectedElement (xmlGetSubElement gSelectedElement theIndex))
+								)
+							(scrShowPane gScreen 'Default)
+							)
+					</Action>
+					<Action id="actionSetAttribute">
+						(scrShowPane gScreen 'EnterName)
+					</Action>
+					<Action id="actionCreateSubelement">
+						(scrShowPane gScreen 'CreateElement)
+					</Action>
+					<Action id="actionSelectSubelement">
+						(scrShowPane gScreen 'SubelementIndex)
+					</Action>
+					<Action id="actionDeleteSubelement">
+						(scrShowPane gScreen 'DeleteElement)
+					</Action>
+					<Action id="actionSetText">
+						(scrShowPane gScreen 'EnterText)
+					</Action>
+					<Action id="actionCreate">
+						(block	(
+									(result (typehackCreateType gXML))
+									)
+							(if (isError result)
+								(setq gResultDesc (cat "Error\n" result))
+								(block Nil
+									(setq gType result)
+									(switch
+										;If this is an item, then add it to the ship
+										(eq (xmlGetTag gXML) 'ItemType)
+											(switch
+												;If this is installable, install it
+												(or
+													(xmlGetSubElement gXML 'Weapon)
+													(xmlGetSubElement gXML 'Shields)
+													(xmlGetSubElement gXML 'Drive)
+													(xmlGetSubElement gXML 'CargoHoldDevice)
+													(xmlGetSubElement gXML 'EnhancerDevice)
+													(xmlGetSubElement gXML 'RepairerDevice)
+													(xmlGetSubElement gXML 'SolarDevice)
+													(xmlGetSubElement gXML 'CyberDeckDevice)
+													(xmlGetSubElement gXML 'AutoDefenseDevice)
+													(xmlGetSubElement gXML 'MiscellaneousDevice)
+													(xmlGetSubElement gXML 'ReactorDevice)
+													)
+													(block	((itemStruct (itmCreate result 1)))
+														(objAddItem gSource itemStruct)
+														(shpInstallDevice gSource itemStruct)
+														(setq gResultDesc (cat "Created new device ItemType: " result ". The item has been installed on your ship."))
+														)
+												(xmlGetSubElement gXML 'Armor)
+													(block	((armorCount (shpGetArmorCount gSource)) (itemStruct (itmCreate result armorCount)))
+														(objAddItem gSource itemStruct)
+														(for i 0 (- armorCount 1)
+															(shpInstallArmor gSource itemStruct i)
+															)
+														(setq gResultDesc (cat "Created new armor ItemType: " result ". The item has been installed on your ship."))
+														)
+												;Otherwise, add it to the cargo hold
+												(block Nil
+													(objAddItem gSource (itmCreate result 500))
+													(setq gResultDesc (cat "Created new ItemType: " result ". The created ItemType has been placed in your cargo hold."))
+													)
+												)
+										(setq gResultDesc (cat "Created new " (xmlGetTag gXML) " : " result))
+										)
+									)
+								)
+							(scrShowPane gScreen 'Result)
+							)
+					</Action>
+					<Action id="actionOutput">
+						(block Nil
+							(printTo 'log (xmlFormat gXML "\t"))
+							(setq gResultDesc "The XML has been printed to debug.log")
+							(scrShowPane gScreen 'Result)
+							)
+					</Action>
+					<Action id="actionLoadXML">
+						(block Nil
+							(scrShowPane gScreen 'LoadXML)
+							)
+					</Action>
+					<Action id="actionExit">
+						<Exit/>
+					</Action>
+				</Actions>
+			</Default>
+			<LoadXML
+					desc=		"Enter a TLisp expression that returns XML code. For instance, try (typGetXML (random (typFind &quot;i&quot;)))"
+					showTextInput=	"true"
+					>
+				<Actions>
+					<Action id="actionEnter">
+						(if (isError (typehackXML (eval (link (scrGetInputText gScreen)))))
+							(scrSetDesc gScreen "Invalid input")
+							)
+					</Action>
+					<Action id="actionCancel">
+						<ShowPane pane="Default"/>
+					</Action>
+				</Actions>
+			</LoadXML>
+			<Result>
+				<OnPaneInit>
+					(scrSetDesc gScreen gResultDesc)
+				</OnPaneInit>
+				<Actions>
+					<Action id="actionContinue">
+						<ShowPane pane="Default"/>
+					</Action>
+					<Action id="actionExit">
+						<Exit/>
+					</Action>
+				</Actions>
+			</Result>
+			<EnterName
+					showTextInput="true"
+					>
+				<OnPaneInit>
+					(block	(
+								(result "Enter the name of the attribute")
+								)
+						(enum (xmlGetAttribList gSelectedElement) theAttrib
+							(setq result (cat result "\n" theAttrib "=" "\"" (xmlGetAttrib gSelectedElement theAttrib) "\""))
+							)
+						(scrSetDesc gScreen result)
+						)
+				</OnPaneInit>
+				<Actions>
+					<Action id="actionEnter">
+						(if (gr (count (scrGetInputText gScreen)) 0)
+							(block Nil
+								(setq gAttributeName (scrGetInputText gScreen))
+								(scrShowPane gScreen 'EnterValue)
+								)
+							)
+					</Action>
+					<Action id="actionCancel">
+						<ShowPane pane="Default"/>
+					</Action>
+				</Actions>
+			</EnterName>
+			<EnterValue
+					desc=		"Enter the value of the attribute (must start with a letter)"
+					showTextInput="true"
+					>
+				<OnPaneInit>
+					(block	(
+								(value (xmlGetAttrib gSelectedElement gAttributeName))
+								)
+						(if value
+							(scrSetInputText gScreen (cat value))
+							)
+						)
+				</OnPaneInit>
+				<Actions>
+					<Action id="actionEnter">
+						(block Nil
+							(xmlSetAttrib gSelectedElement gAttributeName (scrGetInputText gScreen))
+							(scrShowPane gScreen 'Default)
+							)
+					</Action>
+					<Action id="actionCancel">
+						<ShowPane pane="Default"/>
+					</Action>
+				</Actions>
+				
+			</EnterValue>
+			<CreateElement
+					desc=		"Enter the name of the subelement (must start with a letter)"
+					showTextInput="true"
+					>
+				<Actions>
+					<Action id="actionEnter">
+						(if (gr (count (scrGetInputText gScreen)) 0)
+							(block	(
+										(index (xmlGetSubElementCount gSelectedElement))
+										(element (xmlCreate (cat "&lt;" (scrGetInputText gScreen) "/&gt;")))
+										)
+								(xmlAppendSubElement gSelectedElement element index)
+								(setq gSelectedElement (xmlGetSubElement gSelectedElement index))
+								(lnkAppend gIndexPath index)
+								(scrShowPane gScreen 'Default)
+								)
+							)
+					</Action>
+					<Action id="actionCancel">
+						<ShowPane pane="Default"/>
+					</Action>
+				</Actions>
+			</CreateElement>
+			<SubelementIndex
+					showCounter="true"
+					>
+				<OnPaneInit>
+					(block	(
+								(result "Enter the index of the subelement (starts at 0)")
+								)
+						(for i 0 (- (xmlGetSubElementCount gSelectedElement) 1)
+							(setq result (cat result "\n" i ".\t" (xmlGetTag (xmlGetSubElement gSelectedElement i))))
+							)
+						(scrSetDesc gScreen result)
+						)
+				</OnPaneInit>
+				<Actions>
+					<Action id="actionEnter">
+						(block	((index (scrGetCounter gScreen)))
+							(switch
+								(geq index (xmlGetSubElementCount gSelectedElement))
+									(scrSetCounter gScreen (- (xmlGetSubElementCount gSelectedElement) 1))
+								(ls index 0)
+									(scrSetCounter gScreen 0)
+								(block Nil
+									(setq gSelectedElement (xmlGetSubElement gSelectedElement index))
+									(lnkAppend gIndexPath index)
+									(scrShowPane gScreen 'Default)
+									)
+								)
+							)
+					</Action>
+				</Actions>
+			</SubelementIndex>
+			<DeleteElement
+					showTextInput="true"
+					>
+				<OnPaneInit>
+					(block	(
+								(result "Enter the index of the subelement (starts at 0)")
+								)
+						(for i 0 (- (xmlGetSubElementCount gSelectedElement) 1)
+							(setq result (cat result "\n" i ".\t" (xmlGetTag (xmlGetSubElement gSelectedElement i))))
+							)
+						(scrSetDesc gScreen result)
+						)
+				</OnPaneInit>
+				<Actions>
+					<Action id="actionEnter">
+						(block	((index (scrGetCounter gScreen)))
+							(switch
+								(geq index (xmlGetSubElementCount gSelectedElement))
+									(scrSetCounter gScreen (- (xmlGetSubElementCount gSelectedElement) 1))
+								(ls index 0)
+									(scrSetCounter gScreen 0)
+								(block Nil
+									(xmlDeleteSubElement gSelectedElement index)
+									(scrShowPane gScreen 'Default)
+									)
+								)
+							)
+					</Action>
+					<Action id="actionCancel">
+						<ShowPane pane="Default"/>
+					</Action>
+				</Actions>
+			</DeleteElement>
+			<EnterText
+					desc=		"Enter the text for the element"
+					showTextInput="true"
+					>
+				<OnPaneInit>
+					(block	(
+								(result "Enter the text for the element")
+								(text (xmlGetText gSelectedElement 0))
+								)
+						(if (gr (count (split text)) 0)
+							(setq result (cat result "\n" text))
+							)
+						(scrSetDesc gScreen result)
+						(scrSetInputText gScreen (cat text))
+						)
+				</OnPaneInit>
+				<Actions>
+					<Action id="actionEnter">
+						(block Nil
+							(xmlSetText gSelectedElement (scrGetInputText gScreen) 0)
+							(scrShowPane gScreen 'Default)
+							)
+					</Action>
+					<Action id="actionCancel">
+						<ShowPane pane="Default"/>
+					</Action>
+				</Actions>
+			</EnterText>
+		</Panes>
+		
+		<Language>
+			<Text id="actionTypehack">"[T]ypehack"</Text>
+			
+			<Text id="actionScrollUp">"&lt;Scroll Up"</Text>
+			<Text id="actionScrollDown">"&gt;Scroll Down"</Text>
+			
+			<Text id="actionParent">"[P]arent"</Text>
+			
+			<Text id="actionSetAttribute">"Set [A]ttribute"</Text>
+			
+			<Text id="actionCreateSubelement">"[N]ew Subelement"</Text>
+			<Text id="actionSelectSubelement">"[S]elect Subelement"</Text>
+			<Text id="actionDeleteSubelement">"[D]elete Subelement"</Text>
+			
+			<Text id="actionSetText">"Set [T]ext"</Text>
+			
+			<Text id="actionCancel">"^[Esc] Cancel"</Text>
+			<Text id="actionExit">"^[Esc] Exit"</Text>
+			<Text id="actionBack">"^[B]ack"</Text>
+			
+			<Text id="actionContinue">"*[Enter] Continue"</Text>
+			<Text id="actionEnter">"*[Enter] Enter"</Text>
+			
+			<Text id="actionCreate">"[C]reate Type"</Text>
+			<Text id="actionOutput">"[O]utput to debug.log"</Text>
+			<Text id="actionLoadXML">"[L]oad XML"</Text>
+		</Language>
+		<Events>
+			<OnGlobalPaneInit>
+				(if (and (eq (int aScreen) (objGetProperty gPlayerShip 'shipStatusScreen)) (eq aPane "Default"))
+					(scrAddAction gScreen 'actionTypehack -1 "[T]ypehack"
+						(typehackXML)
+						)
+					)
+			</OnGlobalPaneInit>
+		</Events>
+	</DockScreen>
+	
+	<Globals>
+		(block Nil
+			(setq typehackTest (lambda Nil
+				(typehackType (itmGetType (@ (objGetItems gPlayerShip "d") 0)))
+				))
+				
+			(setq gType Nil)
+			(setq gXML (xmlCreate "&lt;Type/&gt;"))
+			(setq gSelectedElement gXML)
+			(setq gAttributeName Nil)
+			(setq gIndexPath (list))
+			(setq gYOffset 0)
+				
+			(setq typehackXML (lambda (xml)
+				(switch
+					xml
+						(block Nil
+							(setq gType Nil)
+							(setq gXML (xmlCreate xml))
+							(setq gSelectedElement gXML)
+							(setq gAttributeName Nil)
+							(setq gIndexPath (list))
+							(setq gYOffset 0)
+							(scrShowScreen gScreen &dsTypehack;)
+							)
+					(or gXML (setq gXML (xmlCreate "&lt;Type/&gt;")))
+						(scrShowScreen gScreen &dsTypehack;)
+					)
+				))
+			(setq typehackType (lambda (type)
+				(switch
+					type
+						(block Nil
+							(typehackXML (typGetXML type))
+							(setq gType type)
+							)
+					gType
+						(typehackXML (typGetXML type))
+					(error "No type specified")
+					)
+				))
+			(setq typehackIndex 0)
+			(setq typehackUNIDs (list))
+			(setq typehackCreateUNID (lambda Nil
+				(block	(
+							(result (typDynamicUNID (cat "typehack_" typehackIndex)))
+							)
+					(setq typehackIndex (+ typehackIndex 1))
+					(lnkAppend typehackUNIDs result)
+					result
+					)
+				))
+			(setq typehackTypes (list))
+			(setq typehackCreateType (lambda (xml)
+				(block	(theError (unid (typehackCreateUNID)) (attempts 0))
+					(loop (and (isError (setq theError (typCreate unid xml))) (ls attempts 20))
+						(block Nil
+							(setq unid (typehackCreateUNID))
+							(setq attempts (+ attempts 1))
+							)
+						)
+					(if (ls attempts 20)
+						(block Nil
+							(lnkAppend typehackTypes unid)
+							unid
+							)
+						theError
+						)
+					)
+				))
+			(setq xmlFormat (lambda (xml indent)
+				(block	(
+							(tag (xmlGetTag xml))
+							(result (cat indent "&lt;" tag))
+							(attribs (xmlGetAttribList xml))
+							(subelementCount (xmlGetSubElementCount xml))
+							(text (xmlGetText xml 0))
+							(indentNext (cat indent "\t"))
+							(indentAttrib (cat indent "\t\t"))
+							(hasText (gr (count (split text)) 0))
+							(hasSubelements (gr subelementCount 0))
+							(hasSubContent (or hasSubelements hasText))
+							)
+					(switch
+						(and attribs hasSubContent)
+							(setq result (cat
+								result
+								(xmlFormatAttribs xml indentAttrib) "\n"
+								indentAttrib "&gt;"
+								(if hasText
+									(cat text "\n")
+									)
+								(if hasSubelements
+									(cat (xmlFormatSubelements xml indentNext) "\n")
+									)
+								indent "&lt;/" tag "&gt;"
+								))
+						attribs
+							(setq result (cat
+								result
+								(xmlFormatAttribs xml indentAttrib) "\n"
+								indentAttrib "/&gt;"))
+						hasSubContent
+							(setq result (cat
+								result "&gt;"
+								(if hasText
+									(cat text "\n")
+									)
+								(if hasSubelements
+									(cat (xmlFormatSubelements xml indentNext) "\n")
+									)
+								indent "&lt;/" tag "&gt;"
+								))
+						(setq result (cat result "/&gt;"))
+						)
+					result
+					)
+				))
+			(setq xmlFormatAttribs (lambda (xml indent)
+				(block	(
+							(result "")
+							theValue
+							)
+					(enum (xmlGetAttribList xml) theAttrib
+						(if (setq theValue (xmlGetAttrib xml theAttrib))
+							(setq result (cat result
+								"\n" indent theAttrib "=" "\"" theValue "\""
+								))
+							)
+						)
+					result
+					)
+				))
+			(setq xmlFormatSubelements (lambda (xml indent)
+				(block	(
+							(result "")
+							)
+					(for i 0 (- (xmlGetSubElementCount xml) 1)
+						(setq result (cat result
+							"\n" (xmlFormat (xmlGetSubElement xml i) indent)
+							))
+						)
+					result
+					)
+				))
+			)
+	</Globals>
+</TranscendenceExtension>

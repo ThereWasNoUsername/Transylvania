@@ -1,0 +1,710 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!DOCTYPE TranscendenceExtension
+[
+	
+	<!--	CUSTOM	ENTITIES	-->
+	<!ENTITY unidExtension					"0xa0130500">
+	<!ENTITY svGhost						"0xa0130501">
+	<!ENTITY ovBones						"0xa0130502">
+	<!ENTITY dsBonesSettings				"0xa0130503">
+	<!ENTITY stBonesEncounter				"0xa0130504">
+<!--
+*Use unvGetExtensionData to get bones info
+*Use unvSetExtensionData to add bones info
+--->
+]>
+<TranscendenceExtension UNID="&unidExtension;" name="Bones 1.42" apiVersion="30" credits="0xABCDEF (Game &amp; Forum) / Archcannon (IRC &amp; Xelerus)">
+	<Library UNID="&unidHumanSpaceLibrary;"/>
+	<Sovereign UNID="&svGhost;"
+				name="Player Ghost"
+				alignment="destructive chaos"
+				>
+			<Relationships>
+				<Relationship sovereign="&svGhost;" disposition="enemy" mutual="true"/>
+		</Relationships>
+	</Sovereign>
+
+	<OverlayType UNID="&ovBones;"
+			attributes=			"Bones"
+			>
+		<StaticData>
+			<Bones>
+
+			</Bones>
+		</StaticData>
+		<Events>
+			<OnGlobalUniverseCreated>
+				(block
+					(
+						(gameCount (+ (unvGetExtensionData 'local "Bones_Game_Count") 1))
+						)
+					
+					(unvSetExtensionData 'local "Bones_Game_Count" gameCount)
+					(typSetData &ovBones; "GameID" gameCount)
+					;(printTo 'log "OnGlobalUniverseCreated")
+					(typSetData &ovBones; "startDate" (unvGetRealDate))
+					(setq gSkipSetup Nil)
+					(objAddOverlay gPlayerShip &ovBones;)
+					)
+			</OnGlobalUniverseCreated>
+			<OnGlobalUniverseLoad>
+				(if (eq aReason 'resurrect)
+					(block
+						(
+							(lastWreck (unvGetExtensionData 'local (cat "Bones_Temporary_" (typGetData &ovBones; "GameID"))))
+							)
+						(typIncData &ovBones; 'deaths 1)
+						(if lastWreck
+							(block Nil
+								(psbLoadBones lastWreck)
+								(gamSave)
+								)
+							)
+						(sysAddTypeTimerEvent 1 &ovBones; 'OnSetupResurrect)
+						)
+					)
+			</OnGlobalUniverseLoad>
+			<OnCreate>
+				(if (not gSkipSetup)
+					(sysAddTypeTimerEvent 1 &ovBones; 'OnSetup)
+					)
+			</OnCreate>
+			<OnSetup>
+				(block Nil
+					;(printTo 'log "OnSetup")
+					(sysStopTime 1800 gPlayerShip)
+					(scrShowScreen gScreen &dsBonesSettings; "New")
+					;(printTo 'log "Completed OnSetup")
+					)
+			</OnSetup>
+			<OnSetupResurrect>
+				(block Nil
+					(sysStopTime 1800 gPlayerShip)
+					(scrShowScreen gScreen &dsBonesSettings; "Old")
+					)
+			</OnSetupResurrect>
+			<OnObjDestroyed>
+				(switch
+					;The player changed ships, but overlays do not transfer.
+					(and (neq gSource gPlayerShip) gPlayerShip)
+						(block Nil
+							(objRemoveOverlay gSource aOverlayID)
+							(setq gSkipSetup True)
+							(objAddOverlay gPlayerShip &ovBones;)
+							(print "Playership Bones: Player changed ships")
+							)
+					(typGetData &ovBones; "Track")
+						(psbSaveBonesPlayer gSource aWreckObj)
+					)
+				;Data structure: Ship Class - List of Armor - List of Devices - List of Items - Node of Death - Location of Death - Status - Name - Start Date - End Date - Epitaph
+			</OnObjDestroyed>
+		</Events>
+	</OverlayType>
+	
+	<DockScreen UNID="&dsBonesSettings;"
+			name=				"Playership Bones Settings"
+			nestedScreen=		"true"
+			>
+		<Panes>
+			<New
+					desc="Welcome to Playership Bones!">
+				<Actions>
+					<Action name="Configure" cancel="1" default="1" key="C">
+						<ShowPane pane="Dump"/>
+					</Action>
+				</Actions>
+			</New>
+			
+			<Old>
+				<OnPaneInit>
+					(block
+						(
+							(deaths (typGetData &ovBones; 'deaths))
+							)
+						(scrSetDesc gScreen
+							
+							(switch
+								(eq deaths 1)
+									(plyComposeString gPlayer "\"On the previous episode of Transcendence, our hero suddenly died. But then %he% was resurrected. The End.\"")
+								(eq deaths 2)
+									"\"Oh no! On the previous episode, our hero died a second time! But, alas, the show must go on! Our hero has been saved a second time by the mysterious force known as Domina (or is it Oracus?). To Be Continued!\""
+								(eq deaths 3)
+									"\"On the previous episode of Transcendence, our hero died yet again, only to be revived, yet again. What a terrible plot.\""
+								(eq deaths 4)
+									"\"Oh look it's that hero who keeps dying, but not really. What happens now?\""
+								(gr (random 1 100) 25)
+									(cat "\"" (count (typFind 's)) " ways to die in Transcendence - Death #" (random 1 1000000) ": Destroyed by an unexpected " (shpGetClassName (random (typFind 's)) 0) " in the " (sysGetName (random (sysGetNodes))) " system.\"")
+								(eq deaths 5)
+									"\"YOU WON'T BELIEVE HOW THIS PERSON REPEATEDLY DIED AND THEN CAME BACK TO LIFE!\""
+								(eq deaths 6)
+									"\"SIX SIGNS THAT YOU NEED TO BE MORE CAREFUL. THE THIRD ONE WILL BLOW YOUR MIND!!!\""
+								(eq deaths 7)
+									"\"7 deaths? How lucky. Actually, no. How unlucky.\""
+								(and (gr (random 1 100) 25) (objGetData gPlayerShip 'commonCrimeRecord))
+									"\"It says here that you have a criminal history. Is this why you have been dying so much?\""
+								(ls deaths 13)
+									"\"Welcome back to You Died! How would you like to die this time?\""
+								(eq deaths 13)
+									"\"13 deaths? How unlucky. No wait, maybe you will stop dying this time.\""
+								(gr deaths 13)
+									"..."
+								)
+							"\n\n"
+							"Welcome back to Playership Bones! Would you like to continue with your old settings?"
+							)
+						)
+				</OnPaneInit>
+				<Actions>
+					<Action name="Continue" default="1" cancel="1" key="C">
+						(block Nil
+							(sysStartTime)
+							(scrExitScreen gScreen)
+							)
+					</Action>
+					<Action name="Reconfigure" key="R">
+						<ShowPane pane="Dump"/>
+					</Action>
+				</Actions>
+			</Old>
+			
+			<Dump
+					desc="Would you like to dump your existing bones into debug.log?">
+
+				<Actions>
+					<Action name="No" key="N" cancel="1">
+						<ShowPane pane="Reset"/>
+					</Action>
+					<Action name="Yes" key="Y" default="1">
+						(block (number)
+							;(printTo 'log "Dumping bones...")
+							(printTo 'log "--------------------------------Dumping your bones!--------------------------------")
+							(setq number 1)
+							(enum (unvGetExtensionData 'local 'Bones) theBones
+								(block Nil
+									(printTo 'log (cat "*Bones Set #" number "*"))
+									(printTo 'log theBones)
+									(setq number (add number 1))
+									)
+								)
+							
+							(printTo 'log "Dumped all your bones! Insert them into the StaticData field in Bones.xml to see them in-game!")
+							;(printTo 'log "Dumping complete")
+							(scrShowPane gScreen "Reset")
+							)
+					</Action>
+				</Actions>
+			</Dump>
+			
+			<Reset
+					desc="Would you like to keep all your old bones?">
+
+				<Actions>
+					<Action name="Keep" key="K" default="1">
+						(block Nil
+							;(printTo 'log "*Keep*")
+							(typSetData &ovBones; 'Reset Nil)
+							(scrShowPane gScreen "Active")
+							)
+					</Action>
+					<Action name="Reset" key="R" cancel="1">
+						(block Nil
+							;(printTo 'log "*Reset*")
+							(typSetData &ovBones; 'Reset True)
+							(scrShowPane gScreen "Active")
+							)
+					</Action>
+				</Actions>
+			</Reset>
+			
+			<Active
+					desc="Would you like to enable Playership Bones and see your old wrecks?">
+
+				<Actions>
+					<Action name="Enable" key="E" default="1">
+						(block Nil
+							;(printTo 'log "*Enable*")
+							(typSetData &ovBones; 'Active True)
+							(scrShowPane gScreen "Track")
+							)
+					</Action>
+					<Action name="Disable" key="D" cancel="1">
+						(block Nil
+							;(printTo 'log "*Disable*")
+							(typSetData &ovBones; 'Active Nil)
+							(scrShowPane gScreen "Track")
+							)
+					</Action>
+				</Actions>
+			</Active>
+			
+			<Track
+					desc="Would you like to add this ship to your bones upon death?">
+
+				<Actions>
+					<Action name="Track" key="T" default="1">
+						(block Nil
+							;(printTo 'log "*Track*")
+							(typSetData &ovBones; 'Track True)
+							(if (typGetData &ovBones; 'Active)
+								(scrShowPane gScreen "Own")
+								(scrShowPane gScreen "Done")
+								)
+							)
+					</Action>
+					<Action name="Ignore" key="I" cancel="1">
+						(block Nil
+							;(printTo 'log "*Ignore*")
+							(typSetData &ovBones; 'Track Nil)
+							(scrShowPane gScreen "Done")
+							)
+					</Action>
+				</Actions>
+			</Track>
+			
+			<Own
+					desc="Would you like this game to include its own wrecks?">
+
+				<Actions>
+					<Action name="Include" key="I" default="1">
+						(block Nil
+							;(printTo 'log "*Include*")
+							(typSetData &ovBones; 'Own True)
+							(scrShowPane gScreen "Done")
+							)
+					</Action>
+					<Action name="Exclude" key="E" cancel="1">
+						(block Nil
+							;(printTo 'log "*Exclude*")
+							(typSetData &ovBones; 'Own Nil)
+							(scrShowPane gScreen "Done")
+							)
+					</Action>
+				</Actions>
+			</Own>
+			
+			<Done
+					desc="Are you ready to use Playership Bones?">
+				<Actions>
+					<Action name="Start" default="1" key="S">
+						(block Nil
+							;(printTo 'log "*Start*")
+							(if (typGetData &ovBones; 'Reset)
+								(unvSetExtensionData 'local 'Bones Nil)
+								)
+							(typSetData &ovBones; 'Configured True)
+							(typFireEvent &stBonesEncounter; "OnInitializeBones")
+							(typFireEvent &stBonesEncounter; "OnGlobalPlayerEnteredSystem")
+							(sysStartTime)
+							(scrExitScreen gScreen)
+							(gamSave)
+							)
+					</Action>
+					<Action name="Reconfigure" cancel="1" key="R">
+						<ShowPane pane="Dump"/>
+					</Action>
+				</Actions>
+			</Done>
+		</Panes>
+
+	</DockScreen>
+	<!--
+	<Globals>
+		(setq print (lambda (message)
+			(block Nil
+				;(printTo 'console message)
+				;(printTo 'log message)
+				)
+			))
+	</Globals>
+	-->
+	
+	<StationType UNID="&stBonesEncounter;"
+		name=               "(bones encounter)"
+		virtual=            "True"
+		>
+		<StaticData>
+			<Months>
+			(
+				"Undecimber"
+				"January"
+				"February"
+				"March"
+				"April"
+				"May"
+				"June"
+				"July"
+				"August"
+				"September"
+				"October"
+				"November"
+				"December"
+			)
+			</Months>
+		</StaticData>
+		<Events>
+			<OnGlobalSystemCreated>
+				(sysCreateStation &stBonesEncounter; Nil)
+			</OnGlobalSystemCreated>
+			<OnInitializeBones>
+				(if (typGetData &ovBones; "Active") ;(printTo 'log "OnInitialize")
+					(block (allTypes allNodes bones) ;compatible: All compatible Bones
+						;(printTo 'log "*Initializing all bones*")
+						(setq allTypes (typFind "*"))
+						(setq allNodes (sysGetNodes))
+						(setq bones (append (unvGetExtensionData 'local 'Bones) (typGetStaticData &ovBones; 'Bones)))
+						;(printTo 'log (cat "Found " (count bones) " bones"))
+						(enum bones theBones
+							(block (class armor devices cargo location node status name startDate endDate epitaph compatibility theNodeSignature)
+								<!--	--
+								(setq class (@ theBones 0)) ;Player's class
+								(setq armor (@ theBones 1))
+								(setq devices (@ theBones 2))
+								(setq cargo (@ theBones 3)) ;Player's cargo
+								(setq node (@ theBones 4)) ;Player's death node
+								(setq location (@ theBones 5))
+								(setq status (@ theBones 6))
+								(setq name (@ theBones 7))
+								(setq startDate (@ theBones 8))
+								(setq endDate (@ theBones 9))
+								(setq epitaph (@ theBones 10))
+								<!--	-->
+								(enum '(class armor devices cargo node location status name startDate endDate epitaph) theData
+									(set theData (@ theBones theData))
+									)
+								<!--	--
+								(printTo 'log (cat "Class: " class))
+								
+								(printTo 'log "*Armor*")
+								(printTo 'log armor)
+
+								(printTo 'log "*Devices*")
+								(printTo 'log devices)
+
+								(printTo 'log "*Cargo*")
+								(printTo 'log cargo)
+
+								(printTo 'log (cat "Node: " node))
+								(printTo 'log "*Locations*")
+								(printTo 'log location)
+
+								(printTo 'log (cat "Status: " status))
+								(printTo 'log (cat "Name: " name))
+								
+								(printTo 'log "*Start*")
+								(printTo 'log startDate)
+
+								(printTo 'log "*End*")
+								(printTo 'log endDate)
+
+								(printTo 'log (cat "Epitaph: " epitaph))
+								
+								(printTo 'log "*Bones*")
+								(printTo 'log bones)
+								<!--	-->
+
+								
+								<!-- Testing (END) -->
+								(setq compatibility True)
+								(enumWhile (append armor devices cargo) compatibility theItem
+									(if (find allTypes (itmGetType theItem))
+										;Compatible
+										Nil
+										
+										;Incompatible
+										(setq compatibility Nil)
+										)
+									)
+								(if (and (find allTypes class) (find allNodes node))
+									;Compatible
+									Nil
+									
+									;Incompatible
+									(setq compatibility Nil)
+									)
+								(setq theNodeSignature (cat node "bones"))
+								(if compatibility ;If any parts are not compatible with this game, do not use this set of bones
+									;Add this set of bones to the bones list of its node
+									(typSetData &ovBones; theNodeSignature (lnkAppend (typGetData &ovBones; theNodeSignature) theBones))
+									
+									;(printTo 'log "Found incompatible bones")
+									)
+								)
+							)
+						;(printTo 'log "*Initialized all bones*")
+						)
+					)
+			</OnInitializeBones>
+			<OnGlobalPlayerEnteredSystem>
+				(if (typGetData &ovBones; "Active")
+					(block (theNodeSignature bones)
+						;(printTo 'log "*Loading bones for this node*")
+						(setq theNode (sysGetNode))
+						(setq theNodeSignature (cat theNode "bones"))
+						(setq bones (typGetData &ovBones; theNodeSignature)) ;The bones in this node
+						;(printTo 'log (cat "Node: " theNode))
+						;(printTo 'log (cat "Node Signature: " theNodeSignature))
+						;(printTo 'log (cat "Found " (count bones) " bones for this node"))
+						(enum bones theBones
+							(psbLoadBones theBones)
+							)
+						(typSetData &ovBones; theNodeSignature Nil) ;Only read each node's set of bones once
+						;(printTo 'log "*Loaded all bones for this node*")
+						)
+					)
+			</OnGlobalPlayerEnteredSystem>
+			<OnDestroy>
+				(block Nil
+					(objEnumItems aWreckObj "*" theItem
+						(objRemoveItem aWreckObj theItem)
+						)
+					(objEnumItems gSource "*" theItem
+						(if (itmIsInstalled theItem)
+							(objAddItem aWreckObj (itmSetProperty theItem 'installed Nil))
+							(objAddItem aWreckObj theItem)
+							)
+						)
+					)
+			</OnDestroy>
+		</Events>
+	</StationType>
+	
+	<Globals>
+		(block Nil
+			(setq psbLoadBones (lambda (theBones)
+				(block (class armor devices cargo location node status name startDate endDate months epitaph graveROM graveText className theShipwreck)
+					;(printTo 'log "Spawning Bones")
+					<!--	--
+					(setq class (@ theBones 0))
+					(setq armor (@ theBones 1))
+					(setq devices (@ theBones 2))
+					(setq cargo (@ theBones 3))
+					(setq node (@ theBones 4))
+					(setq location (@ theBones 5))
+					(setq status (@ theBones 6))
+					(setq name (@ theBones 7))
+					(setq startDate (@ theBones 8))
+					(setq endDate (@ theBones 9))
+					(setq epitaph (@ theBones 10))
+					<!--	-->
+					(enum '(class armor devices cargo node location status name startDate endDate epitaph) theData
+						(set theData (@ theBones theData))
+						)
+					(setq months (typGetStaticData &stBonesEncounter; 'Months))
+					(setq className (shpGetClassName class 0x020))
+					
+					(setq graveROM (itmCreate &itDataROM; 1))
+					(setq graveText (cat
+						"YASD\n"
+						name "\n"
+						className "\n"
+						startDate " - " endDate "\n"
+						epitaph
+						))
+					(setq graveROM (itmSetData graveROM "Text" graveText))
+					<!--	--
+					(printTo 'log (cat "Class: " class))
+					
+					(printTo 'log "*Armor*")
+					(printTo 'log armor)
+					
+					(printTo 'log "*Devices*")
+					(printTo 'log devices)
+					
+					(printTo 'log "*Cargo*")
+					(printTo 'log cargo)
+					
+					(printTo 'log (cat "Node: " node))
+					
+					(printTo 'log "*Location*")
+					(printTo 'log location)
+					
+					(printTo 'log (cat "Status: " status))
+					
+					(printTo 'log (cat "Name: " name))
+					
+					(printTo 'log "*Start*")
+					(printTo 'log startDate)
+					
+					(printTo 'log "*End*")
+					(printTo 'log endDate)
+					
+					(printTo 'log (cat "Epitaph: " epitaph))
+					
+					(printTo 'log "*Bones*")
+					(printTo 'log bones)
+					<!--	-->
+					(switch
+						(eq status 'wreck)
+							(block Nil
+								(setq theShipwreck (sysCreateShipwreck class location &svPlayer;)) ;(sysVectorPolarOffset Nil (sysVectorAngle location) (sysVectorDistance location))
+								(objSetName theShipwreck (cat "The wreck of " name "'s " className) 40)
+								(staSetShowMapLabel theShipwreck True)
+								
+								(enum (append armor devices cargo) theItem
+									(objAddItem theShipwreck theItem)
+									)
+								)
+							
+						(eq status 'ghost)
+							(block Nil
+								(setq theShipwreck (sysCreateShip class (sysVectorPolarOffset Nil (sysVectorAngle location) (sysVectorDistance location)) &svGhost;))
+								
+								;Replace the armor with the player's armor
+								(for i 0 (subtract (shpGetArmorCount theShipwreck) 1)
+									(block (theArmorItem)
+										(setq theArmorItem (@ armor i))
+										(objAddItem theShipwreck theArmorItem)
+										(shpInstallArmor theShipwreck theArmorItem i)
+										)
+									)
+								
+								;Remove all original devices
+								(enum (objGetItems theShipwreck "*I~aI") theDevice
+									(shpRemoveDevice theShipwreck theDevice)
+									)
+									
+								;Remove all original cargo
+								(enum (objGetItems theShipwreck "*U") theItem
+									(objRemoveItem theShipwreck theItem)
+									)
+								
+								;Install player's devices
+								(enum devices theDevice
+									(block Nil
+										(objAddItem theShipwreck theDevice)
+										(shpInstallDevice theShipwreck theDevice)
+										)
+									)
+									
+								;Add the player's cargo
+								(enum cargo theItem
+									(objAddItem theShipwreck theItem)
+									)
+									
+								(objSetName theShipwreck name 40)
+								(shpOrderImmediate theShipwreck 'wander)
+								(shpSetAISetting theShipwreck 'aggressor True)
+								(shpSetAISetting theShipwreck 'fireAccuracy 100)
+								(shpSetAISetting theShipwreck 'fireRateAdj 10)
+								(shpSetAISetting theShipwreck 'fireRangeAdj 100)
+								(shpSetAISetting theShipwreck 'perception 100)
+								(objSetEventHandler theShipwreck &stBonesEncounter;)
+								)
+						)
+					(objAddItem theShipwreck graveROM)
+					;(printTo 'log "Spawned Bones")
+					)
+				))
+			(setq psbSaveBonesPlayer (lambda (ship wreck)
+				(block (class armor devices cargo node location status name startDate endDate epitaph bones theNodeSignature)
+					;(printTo 'log "*aDestroyReason*")
+					;(printTo 'log aDestroyReason)
+					;(printTo 'log "*Creating new bones*")
+					(setq class (shpGetClass gSource)) ;The player's class
+					(enum (objGetItems gSource "aI") theArmor
+						(block (theArmorItem)
+							(setq theArmorItem (itmSetProperty theArmor 'installed Nil))
+							(setq armor (lnkAppend armor theArmorItem))
+							)
+						)
+					(enum (objGetItems gSource "*I~aI") theDevice
+						(block (theDeviceItem)
+							(setq theDeviceItem (itmSetProperty theDevice 'installed Nil))
+							(setq devices (lnkAppend devices theDeviceItem))
+							)
+						)
+					(setq cargo (objGetItems gSource "*U")) ;The player's cargo
+					(setq node (sysGetNode)) ;Where the player died
+					(setq location (objGetPos gSource))
+					
+					(if wreck
+						(setq status 'wreck)
+						(setq status 'ghost)
+						)
+					
+					(setq name (plyComposeString gPlayer "%name%"))
+					
+					(setq startDate (typGetData &ovBones; "startDate"))
+					(setq endDate (unvGetRealDate))
+					
+					(switch
+						(eq aDestroyReason 'self)
+							(setq epitaph (plyComposeString gPlayer (cat "%name% self-destructed in the " (sysGetName) " system. ")))
+							
+						(eq aDestroyReason 'damage)
+							(setq epitaph (plyComposeString gPlayer (cat "%name% was destroyed by " (objGetName aOrderGiver 4) " in the " (sysGetName) " system. ")))
+
+						(eq aDestroyReason 'runningOutOfFuel)
+							(setq epitaph (plyComposeString gPlayer (cat "%name% ran out of fuel in the " (sysGetName) " system. ")))
+
+						(setq epitaph (plyComposeString gPlayer (cat "%name% was destroyed by unknown forces in the " (sysGetName) " system.")))
+						)
+					(setq bones {
+						class:		class
+						armor:		armor
+						devices:	devices
+						cargo:		cargo
+						node:		node
+						location:	location
+						status:		status
+						name:		name
+						startDate:	startDate
+						endDate:	endDate
+						epitaph:	epitaph
+						})
+					<!--	--
+					(printTo 'log (cat "Class: " class))
+					
+					(printTo 'log "*Armor*")
+					(printTo 'log armor)
+
+					(printTo 'log "*Devices*")
+					(printTo 'log devices)
+
+					(printTo 'log "*Cargo*")
+					(printTo 'log cargo)
+					
+					(printTo 'log (cat "Node: " node))
+					
+					(printTo 'log "*Location*")
+					(printTo 'log location)
+
+					(printTo 'log (cat "Status: " status))
+					
+					(printTo 'log (cat "Name: " name))
+					
+					(printTo 'log "*Start*")
+					(printTo 'log startDate)
+
+					(printTo 'log "*End*")
+					(printTo 'log endDate)
+
+					(printTo 'log "*Epitaph*")
+					(printTo 'log epitaph)
+					-->
+					(printTo 'log "--------------------------------You made new bones!--------------------------------")
+					(printTo 'log bones)
+					(printTo 'log "----------------Insert these into the StaticData field of Bones.xml to see them in-game!----------------")
+					
+					(unvSetExtensionData 'local 'Bones (lnkAppend (unvGetExtensionData 'local 'Bones) bones))
+					;(printTo 'log "*Created new bones*")
+					
+					;This allows bones to appear in the game they were created in
+					(if (typGetData &ovBones; 'Own)
+						(block Nil
+							<!--	-->
+							(setq theNodeSignature (cat (sysGetNode) "bones"))
+							(typSetData &ovBones; theNodeSignature (lnkAppend (typGetData &ovBones; theNodeSignature) bones))
+							(typFireEvent &stBonesEncounter; "OnGlobalPlayerEnteredSystem")
+							<!--	-->
+							(unvSetExtensionData 'local (cat "Bones_Temporary_" (typGetData &ovBones; "GameID")) bones)
+							(if wreck
+								(objDestroy wreck)
+								)
+							)
+						)
+					)
+				))
+			)
+	</Globals>
+</TranscendenceExtension>

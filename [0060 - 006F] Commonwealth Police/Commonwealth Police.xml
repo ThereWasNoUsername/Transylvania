@@ -1,0 +1,3190 @@
+<?xml version="1.0" encoding="utf-8"?>
+
+<!DOCTYPE TranscendenceExtension
+[
+<!-- CUSTOM ENTITIES -->
+	<!ENTITY unidHumanSpaceLibrary			"0x00100000">
+	<!ENTITY unidArchGlobals				"0xA0130000">
+	
+	<!ENTITY unidExtension					"0xa0130060">
+	<!--
+	<!ENTITY evCommPoliceChiefBehavior		"0xED6E2F11">
+	-->
+	<!ENTITY evCommStrikeCaptain			"0xa0130061">
+	<!ENTITY evCommStrikeOfficer			"0xa0130062">
+	<!ENTITY evCommPoliceCaptain			"0xa0130063">
+	<!ENTITY evCommPoliceOfficer			"0xa0130064">
+	
+	<!ENTITY etCommStrikeForce1				"0xa0130065">
+	<!ENTITY etCommStrikeForce2				"0xa0130066">
+	<!ENTITY etCommStrikeForce3				"0xa0130067">
+	<!ENTITY etCommStrikeForce4				"0xa0130068">
+	<!ENTITY etCommStrikeForce5				"0xa0130069">
+	<!ENTITY etCommStrikeForce6				"0xa013006A">
+	
+	<!ENTITY itABCDEFNewsArticle			"0xa013006B">
+]>
+
+<TranscendenceExtension UNID="&unidExtension;" name="Commonwealth Police 0.70" apiVersion="30" credits="0xABCDEF (Game &amp; Forum) / Archcannon (IRC &amp; Xelerus)">
+	<Library UNID="&unidArchGlobals;"/>
+	<Library UNID="&unidHumanSpaceLibrary;"/>
+	
+	<Sovereign UNID="&svCommonwealth;"
+			name="Commonwealth"
+			alignment="constructive chaos"
+			>
+		<StaticData>
+			<Data id="PoliceCaptainTable">
+				(
+					&scRoninB;
+					&scAsterionHeavyGunship;
+					&scRoninC;
+					&scManticore;
+					&scCenturion;
+					&scBritannia;
+					)
+			</Data>
+			<Data id="StrikeForceTable">
+				(
+					&etCommStrikeForce1;
+					&etCommStrikeForce2;
+					&etCommStrikeForce3;
+					&etCommStrikeForce4;
+					&etCommStrikeForce5;
+					&etCommStrikeForce6;
+					)
+			</Data>
+		</StaticData>
+		<Events>
+			<GetGlobalDockScreen>
+				; If the player has docked with an active commonwealth station
+				; with customs, then we need to check for various things
+				; (like radiation poisoning and smuggling).
+				;
+				; NOTE: We return a screen and a priority. The priority is used
+				; to decide whether other screens should be shown before or after
+				; these. Follow these rules:
+				;
+				; Screens that prevent docking:				10
+				; Screens that imprison the player:			8
+				; Screens that confiscate:					6
+				; Screens that complete missions:			4
+				
+				(switch
+					; This does not apply to stations without customs
+					(not (objMatches gSource Nil "sTAV +commonwealthCustoms;"))
+						Nil
+
+					; If the player ship is radioactive, then we need to
+					; decontaminate.
+					(shpIsRadioactive gPlayerShip)
+						(list &dsCommonwealthDecon; 10)
+
+					; If the player has any crime, then he/she is arrested
+					(cmwGetCrimes gPlayerShip)
+						(list &dsCommonwealthImprison; 8)
+						
+					; If the player has slaves then free them
+					(and (objGetItems gPlayerShip "*+Slaves;")
+							(not (objGetData gPlayerShip "00001002_ConfiscateSlaves"))
+							)
+						(list &dsCommonwealthFreeSlaves; 8)
+						
+					; If the player has a black market container, then she is imprisoned
+					(and (not (objGetItems gPlayerShip "*I+SmugglersHold;")) 
+							(objGetItems gPlayerShip "*U+SealedContainer;")
+							(not (objGetData gPlayerShip "00001002_ConfiscateSealedContainer"))
+							)
+						(block Nil
+							; This side-effect is OK because it is OK if we call it multiple
+							; times, and it is OK if some other screen takes priority.
+							(cmwCrime gPlayerShip 3 "smuggling" 'smuggling Nil True)
+							(list &dsCommonwealthImprison; 8)
+							)
+							
+					; If we have illegal items in the cargo hold then we need
+					; to confiscate them
+					(and (not (objGetItems gPlayerShip "*I+SmugglersHold"))
+							(or (objGetItems gPlayerShip "*U+Illegal; -ID")
+								(and (objGetItems gPlayerShip "*U+Military") (not (objGetItems gPlayerShip "*+MilitaryID")))))
+						(list &dsCommonwealthConfiscate; 6)
+					Nil
+					)
+			</GetGlobalDockScreen>
+			<OnGlobalObjDestroyed>
+				(if (and (eq (objGetSovereign aObjDestroyed) &svCommonwealth;) (objIsShip aObjDestroyed))
+					(block
+						(
+							(bystanders (filter (sysFindObject aObjDestroyed "sA F J:&svCommonwealth; Z") theShip (and (not (objGetEventHandler theShip)) (objCanDetectTarget theShip aObjDestroyed))))
+							(intAlertBystanders (lambda (ships target)
+								(enum ships theShip
+									(if (and (gr (shpGetMatchup theShip target) 1) (gr (objGetDestiny theShip) 180))
+										(shpOrderImmediate gSource 'attack target)
+										)
+									)
+								))
+							;Destroyer had murderous intent
+							(intAddMurderCrime (lambda (victim destroyer)
+								(if (objHasAttribute victim "freighter")
+									(cmwCrime destroyer 3 (cat "piracy against " (objGetName victim 0x0001)) 'piracy victim)
+									(cmwCrime destroyer 2 (cat "violence against " (objGetName victim 0x0001)) 'murder victim)
+									)
+								))
+							;Destroyer was trying to attack an enemy
+							(intAddNegligenceCrime (lambda (victim destroyer)
+								(if (objHasAttribute victim "freighter")
+									(cmwCrime destroyer 2 (cat "negligence resulting in the destruction of " (objGetName victim 0x0001)) 'negligence victim)
+									(cmwCrime destroyer 1 (cat "negligence resulting in the destruction of " (objGetName victim 0x0001)) 'negligence victim)
+									)
+								))
+							(dockObj (shpGetDockObj aObjDestroyed))
+							)
+						;(print (cat "Docked: " (objGetName dockObj)))
+						;(print (cat "Bystanders: " (count bystanders)))
+						(switch
+							(not aOrderGiver)
+								Nil
+							;Do not charge special ranks with crimes
+							(find (list &evCommStrikeCaptain; &evCommStrikeOfficer; &evCommPoliceCaptain; &evCommPoliceOfficer;) (objGetEventHandler aOrderGiver))
+								Nil
+							;If the victim was considered a pirate, then its destruction was justified.
+							(gr (cmwGetPunishmentSeverity (cmwGetKnownCrimes aObjDestroyed)) 2)
+								Nil
+							(objGetData aObjDestroyed "noPiracyCheck")
+								Nil
+								
+							;If this ship is docked at a station, let the station handle it
+							dockObj
+								(objFireEvent dockObj "OnAttacked")
+								
+							;If the destroyer was intentionally attacking or was already an enemy
+							(or (objIsEnemy aObjDestroyed aOrderGiver) (gr (objGetRecentDispositionDamageRatio aOrderGiver) 1))
+								(block Nil
+									(intAddMurderCrime aObjDestroyed aOrderGiver)
+									(intAlertBystanders bystanders aOrderGiver)
+									(cwpStrikeForceCheck)
+									)
+							
+							(leq (objGetRecentDispositionDamageRatio aOrderGiver) 1)
+								(intAddNegligenceCrime aObjDestroyed aOrderGiver)
+								
+							(objSendMessage gPlayerShip aOrderGiver "Destroyed")
+							)
+						
+						;(print (cat (objGetName aOrderGiver) " destroyed " (objGetName aObjDestroyed)))
+						)
+					)
+			</OnGlobalObjDestroyed>
+			<GetGlobalAchievements>
+				(block ((untriedCrimes (cmwGetCrimes gPlayerShip)) (triedCrimes (cmwGetCrimesRecord gPlayerShip)) (allCrimes (append untriedCrimes triedCrimes)))
+					(append
+						(map untriedCrimes theCrime
+							(list (@ theCrime 'description) Nil "commonwealth crimes (untried)")
+							)
+						(map triedCrimes theCrime
+							(list (@ theCrime 'description) Nil "commonwealth crimes (tried)")
+							)
+						)
+					)
+			</GetGlobalAchievements>
+		</Events>
+	</Sovereign>
+	<Sovereign UNID="&svCommonwealthFleet;"
+			name="Commonwealth Fleet"
+			alignment="constructive chaos"
+			>
+
+		<Events>
+			<GetGlobalAchievements>
+				(block (theList p262rescue p262prototype antarcticaStatus medsDonated)
+
+					; Rank
+					
+					(if (gr (objGetData gPlayerShip "fleetXP") 0)
+						(block (rank)
+							(setq rank (objGetData gPlayerShip "fleetLevel"))
+							(setq theList (list
+								(list
+									"Commonwealth Fleet rank"
+									(switch
+										(eq rank 1) "Civilian"
+										(eq rank 2) "Privateer"
+										(eq rank 3) "Master sergeant"
+										(eq rank 4) "Fleet lieutenant"
+										(eq rank 5) "Fleet commander"
+										(eq rank 6) "Fleet captain"
+										(cat "ERROR: Fleet rank: " rank)
+										)
+									)
+									
+								(list
+									"CSC missions"
+									(intMissionAchievementString (typGetGlobalData &scCSCTaskForce; "missionsCompleted") (typGetGlobalData &scCSCTaskForce; "missionsFailed"))
+									"missions &amp; activities"
+									)
+								))
+							)
+						)
+						
+					; Project262 rescue
+					
+					(setq p262rescue (typGetGlobalData &scCSCTerra; "p262scientists"))
+					(if p262rescue
+						(setq theList (append theList (list
+							(list
+								(switch
+									(eq p262rescue 'rescued) "Rescued Project Lamplighter scientists"
+									(eq p262rescue 'failed) "Failed to rescue Project Lamplighter scientists"
+									(cat "ERROR: p262scientists: " p262scientists)
+									)
+								Nil
+								"achievements &amp; regrets"
+								)
+							)))
+						)
+						
+					; Project262 prototype
+					
+					(setq p262prototype (typGetGlobalData &scCSCTerra; "p262protoype"))
+					(if p262prototype
+						(setq theList (append theList (list
+							(list
+								(switch
+									(eq p262prototype 'recovered) "Recovered Project Lamplighter prototype"
+									(cat "ERROR: p262prototype: " p262prototype)
+									)
+								Nil
+								"achievements &amp; regrets"
+								)
+							)))
+						)
+						
+					; Lamplighter
+					
+					(if (eq (typGetGlobalData &scCSCTerra; "p262test") 'installed)
+						(setq theList (append theList (list
+							(list "Acquired Lamplighter archcannon" Nil "achievements &amp; regrets")
+							)))
+						)
+						
+					; Antarctica
+					
+					(setq antarcticaStatus (typGetGlobalData &scCSCTerra; "antarctica"))
+					(if antarcticaStatus
+						(setq theList (append theList (list
+							(list
+								(switch
+									(eq antarcticaStatus 'escaped) "Defended the CSC Antarctica"
+									(eq antarcticaStatus 'destroyed) "Failed to defend the CSC Antarctica"
+									(eq antarcticaStatus 'destroyedByPlayer) "Destroyed the CSC Antarctica"
+									(eq antarcticaStatus 'betrayed) "Betrayed the CSC Antarctica"
+									(cat "ERROR: antarctica: " antarcticaStatus)
+									)
+								Nil
+								"achievements &amp; regrets"
+								)
+							)))
+						)
+						
+					; Meds donated
+					
+					(if (setq medsDonated (typGetGlobalData &svCommonwealthFleet; "medsDonated"))
+						(setq theList (append theList (list
+							(list "Value of supplies donated to Commonwealth Fleet" medsDonated "missions &amp; activities")
+							)))
+						)
+
+					theList
+					)
+			</GetGlobalAchievements>
+			
+			<GetGlobalDockScreen>
+				(switch
+					; This only applies to Fleet ships and stations
+					(not (objMatches gSource Nil "sTAV +commonwealthFleet;"))
+						Nil
+						
+					; If the ship is radioactive then we need to decontaminate
+					(shpIsRadioactive gPlayerShip)
+						(list &dsFleetDecon; 10)
+						
+					; The remaining screens are only invoked if the ship/station
+					; implements Fleet Law (e.g., CSC Antarctica does not).
+					(not (objHasAttribute gSource "fleetLaw"))
+						Nil
+						
+					; If the player has committed a fleet crime, then imprisonment
+					(geq (int (objGetData gPlayerShip "fleetCrimeSeverity")) 2)
+						(list &dsFleetImprison; 8)
+						
+					; If the player has committed a Commonwealth crime then she
+					; is kicked out of the military.
+					(and (geq (cmwGetPunishmentSeverity (cmwGetKnownCrimes gPlayerShip)) 3)
+							(leq (objGetData gPlayerShip "fleetLevel") 3))
+						(list &dsFleetDischarge; 8)
+						
+					; If the player does not have a military ID, then
+					; refuse dock
+					(not (objGetItems gPlayerShip "*+MilitaryID"))
+						(list &dsFleetRefuseDock; 6)
+						
+					; If the player has committed a Commonwealth crime but is a
+					; Fleet lieutenant or higher, then she gets a warning.
+					(and (geq (cmwGetPunishmentSeverity (cmwGetKnownCrimes gPlayerShip)) 3)
+							(not (eq (typGetGlobalData &svCommonwealthFleet; 'commonCrimeWarning) (objGetData gPlayerShip "commonCrime"))))
+						(list &dsFleetCrimeWarning; 5)
+
+					Nil
+					)
+			</GetGlobalDockScreen>
+
+			<OnGlobalUniverseCreated>
+				(block Nil
+					; Initialize all variables that we need
+					(objSetData gPlayerShip "fleetXP" 0)
+					(objSetData gPlayerShip "fleetLevel" 1)
+					(objSetData gPlayerShip "fleetTFSuccess" 0)
+					(objSetData gPlayerShip "fleetTFFailure" 0)
+					)
+			</OnGlobalUniverseCreated>
+		</Events>
+	</Sovereign>
+	<StationType UNID="&stStartonEridani;"
+			name=				"Starton Eridani"
+			sovereign=			"&svCommonwealth;"
+			inherit=			"&baCommonwealthStation;"
+				 
+			level=				"4"
+			attributes=			"commonwealth, commonwealthCustoms, friendly, human, majorStation, populated, startonEridani"
+				 
+			dockScreen=			"&dsCommonwealthStation;"
+			abandonedScreen=	"&dsAbandonedStation;"
+
+			size=				"670"
+			armorID=			"&itPlasteelPlate;"
+			hitPoints=			"800"
+			multiHull=			"true"
+			regen=				"8"
+			shipRegen=			"4"
+				 
+			canAttack=			"true"
+			explosionType=		"&vtBlastExplosion3;"
+			ejectaType=			"&vtWreckEjecta;"
+			>
+
+		<Names noArticle="true">
+			Starton Eridani
+		</Names>
+		
+		<!-- Trade and Items -->
+		
+		<Trade currency="credit" max="100000" replenish="5000">
+			<Sell	criteria="m +commonwealth; -illegal; -military; -notForSale; -notStandard;" priceAdj="115" inventoryAdj="200" levelFrequency="systemLevel:ruc|c|cur"/>
+			<Sell	criteria="*NU -Illegal; -ID; -NotForSale;"	priceAdj="110"/>
+			<Buy	criteria="amswNU -Illegal; -NotForSale;"		priceAdj="50"/>
+			<Buy	criteria="*NU -Illegal; -ID; -NotForSale;"	priceAdj="90"/>
+			<Buy	criteria="*NU -Illegal; -ID;"				priceAdj="10"/>
+			
+			<Refuel			criteria="f +BasicFuel; L:1-6;" priceAdj="100"/>
+			<RepairArmor	criteria="a L:1-7;" priceAdj="100"/>
+			<ReplaceArmor	criteria="a L:1-7;" priceAdj="100"/>
+			<InstallDevice	criteria="d L:1-6;" priceAdj="100"/>
+			<RemoveDevice	criteria="d L:1-6;" priceAdj="100"/>
+		</Trade>
+
+		<Items>
+			<RandomItem count="2d10" 
+					criteria=		"a L:1-7; -alien; -illegal; -military; -notForSale; -notStandard; -specialty;"
+					levelFrequency=	"systemLevel:u|c|crv"
+					/>
+			<RandomItem count="1d4" 
+					criteria=		"r L:1-6; -alien; -illegal; -military; -notForSale; -notStandard;"	
+					levelFrequency="systemLevel:ru|c|curv"
+					/>
+			<RandomItem count="2d10" 
+					criteria=		"d~r L:1-6; -alien; -illegal; -military; -notForSale; -notStandard; -specialty;"
+					levelFrequency=	"systemLevel:u|c|crv"
+					/>
+			
+			<RandomItem count="20" 
+					criteria=		"*~ad -alien; -illegal; -military; -notForSale; -notStandard; -specialty;"
+					levelFrequency=	"systemLevel:ru|c|cur"
+					/>
+		</Items>
+
+		<!-- Ships and Defenses -->
+		
+		<Ships>
+			<Lookup count="3" table="&tbCommEliteDefenders;"/>
+			<Lookup count="1d4" table="&tbCommPrivateCrafts;"/>
+		</Ships>
+
+		<Reinforcements minShips="5">
+			<Table>
+				<Lookup chance="75" table="&tbCommEliteDefenders;"/>
+				<Lookup chance="25" table="&tbCommPrivateCrafts;"/>
+			</Table>
+		</Reinforcements>
+
+		<!-- Image and Effects -->
+
+		<Image			imageID="&rsCommonwealthMetropolis;" imageWidth="480" imageHeight="480"/>
+
+		<DockingPorts
+				portCount=		"14"
+				portRadius=		"245"
+				>
+		</DockingPorts>
+		
+		<!-- Events and Behavior -->
+		
+		<Events>
+			<OnContractGenerate>
+				(intGenerateStandardRequestContract1)
+			</OnContractGenerate>
+
+			<OnContractQuery>True</OnContractQuery>
+			
+			<OnCreate>
+				(block Nil
+					;The line below is the entire reason why I have to override Starton Eridani
+					(typFireObjEvent &baCommonwealthStation; gSource 'OnCreate)
+					(sysAddObjRecurringTimerEvent 150 gSource "OnTrafficControl")
+					)
+			</OnCreate>
+
+			<OnTrafficControl>
+				(comTrafficControl gSource 20)
+			</OnTrafficControl>
+		</Events>
+
+		<StaticData>
+			<Info>
+				"Welcome to the Eridani system and to Starton Eridani! Settled in 2176, our small star system is one of the most friendly in all the Commonwealth. Whatever your purpose here, whether business or pleasure, we're sure that you will enjoy your stay! Please select your topic of interest:"
+			</Info>
+
+			<TouristInfo>
+				"Though far from St. Katharine's Star, the Eridani system is not the backwater station shown on the 3DVs. The bars and nightclubs of Central Plaza are always ready for visitors. But if you prefer a quieter time, you can travel out to St. John's ice moon and visit the monastery of the Sisters of Domina."
+			</TouristInfo>
+
+			<CorporateInfo>
+				"If you are here on corporate business you will find the Commodities Exchange to have many popular items, including starship equipment. The Corporate Enclave near Starton Eridani also trades in supplies.\n\nNote: In accordance with Commonwealth laws, all customs officers are required to search for contraband&#x97;buy and sell legal goods only."
+			</CorporateInfo>
+
+			<TravelInfo>
+				"Starships are very common here, so you will have no problem obtaining fuel or making repairs to your ship. Starton Eridani's shipyard can install new devices on your ship. And when you've enjoyed everything that the Eridani system has to offer, you can find an outbound stargate around the innermost planet."
+			</TravelInfo>
+
+			<SafetyInfo>
+				"Like any populated star system, Eridani has its share of dangers. Charon pirates and Centauri warlords control some parts of the system&#x97;avoid all non-Commonwealth stations unless escorted or armed.\n\nNote: In accordance with Commonwealth laws, legally armed ships may attack and loot designated enemy targets only. Ships attacking Commonwealth stations or ships will be prosecuted and/or fired upon."
+			</SafetyInfo>
+
+			<FunFacts>
+				(
+				"Starton is more than seven stargates away from St. Katharine's Star."
+				"Starton Eridani was founded by the Commonwealth in 2176."
+				"According to the 2410 census, 29 million people live in this star system; half of them live in Starton Eridani itself."
+				"For some reason, more pilgrims have started their journey to the Galactic Core from Eridani than from any other system of the Commonwealth."
+				"Conrad Decker, admiral of the Commonwealth Fleet, spent his summers in Starton Eridani as a young boy."
+				"In 2240, Starton Eridani was almost evacuated because of rumors that a large Ares fleet was approaching. It later turned out to be a group of Salvagers traveling together."
+				"During the Eridani Bicentennial in 2376, then governor Jerad Norton convinced the Charon pirates to join in the celebrations in exchange for an unspecified sum."
+				)
+			</FunFacts>
+		</StaticData>
+	</StationType>
+	<ShipClass unid="&evCommStrikeCaptain;"
+			name=			"(Commonwealth strike force captain)"
+			virtual=		"true"
+			>
+		<Events>
+			<OnCreate>
+				(block Nil
+					(objSetData gSource 'commStrikeForce True)
+					(objSendMessage gPlayerShip gSource "Strike Force reporting in.")
+					)
+			</OnCreate>
+			<OnDestroy>
+				(block Nil
+					(sysIncData 'commActiveStrikeForces -1)
+					(cmwCrime aOrderGiver 4 "the killing of a Commonwealth strike captain" 'murder gSource)
+					)
+			</OnDestroy>
+		</Events>
+	</ShipClass>
+	<ShipClass unid="&evCommStrikeOfficer;"
+			name=			"(Commonwealth strike force officer)"
+			virtual=		"true"
+			>
+		<Events>
+			<OnCreate>
+				(objSetData gSource 'commStrikeForce True)
+			</OnCreate>
+			<OnDestroy>
+				(cmwCrime aOrderGiver 3 "the killing of a Commonwealth strike officer" 'murder gSource)
+			</OnDestroy>
+		</Events>
+	</ShipClass>
+	<ShipClass UNID="&evCommPoliceCaptain;"
+			class=				"(commonwealth police captain behavior)"
+			virtual=			"true"
+			
+			attributes=			"behaviorClass"
+			>
+
+		<Events>
+			<OnCreate>
+				(block Nil
+					(shpInstallNewDevice gSource (itmCreate &itTitanFusionDrive; 1))
+					(objEnumItems gSource "*I" theItem
+						(shpEnhanceItem gSource theItem 0x0105)
+						)
+					)
+			</OnCreate>
+			<OnSquadronCheck>
+				(block
+					(
+						(standardEscortCount (cwpGetReinforcementCount))
+						(escortsNeeded (subtract
+							(if (objGetObjRefData gSource "&evCommPoliceCaptain;_target")
+								12
+								standardEscortCount
+								)
+							(count (cwpGetOfficers gSource))
+							))
+						)
+					(prnEventStart "&evCommPoliceCaptain;_OnSquadronCheck")
+					;(print (cat "Escorts Needed: " escortsNeeded))
+					;(gr escortsNeeded (seededRandom (objGetDestiny gSource) 0 (divide standardEscortCount 5)))
+					(if (gr escortsNeeded 0)
+						(block ((gate (objGetNearestStargate gSource)))
+							(objSetObjRefData gSource "&evCommPoliceCaptain;_officerSpawnGate" gate)
+							<!--	--
+							(shpOrder gSource 'goto (sysVectorPolarOffset gate (sysVectorAngle gate gSource) 20))
+							<!--	-->
+							(shpCancelOrders gSource)
+							(shpOrder gSource 'approach gate 25)
+							(shpOrder gSource 'wait (randomGaussian 1 2 5)) <!--3 5-->
+							(for i 1 escortsNeeded
+								(block Nil
+									(shpOrder gSource 'fireEvent gSource "OnDeployOfficer")
+									(shpOrder gSource 'wait (random 1 3))
+								))
+							(shpOrder gSource 'fireEvent gSource 'OnSquadronReady)
+							
+							(objSetData gSource "&evCommPoliceCaptain;_behavior" 'actCallSquadron)
+							)
+						(objFireEvent gSource 'OnSquadronReady)
+						)
+					(prnEventEnd "&evCommPoliceCaptain;_OnSquadronCheck")
+					)
+			</OnSquadronCheck>
+			<OnDeployOfficer>
+				(cwpOnDeployOfficer gSource (objGetObjRefData gSource "&evCommPoliceCaptain;_officerSpawnGate"))
+			</OnDeployOfficer>
+			<OnDismissOfficers>
+				(block	(
+							(officers (cwpGetOfficers gSource))
+							)
+					(for i 1 (- (count officers) (cwpGetReinforcementCount))
+						(block	(
+									(theIndex (random 0 (- (count officers) 1)))
+									(theOfficer (@ officers theIndex))
+									)
+							(shpCancelOrders theOfficer)
+							(lnkRemove officers theIndex)
+							)
+						)
+					)
+			</OnDismissOfficers>
+			<OnDeployStrikeForce>
+				(block ((target (cwpGetCaptainTarget gSource)) (severity (min (cmwGetThreatLevel target) 5)))
+					(if (and target (cwpTargetStrikeCheck target))
+						(cwpCreateStrikeForce target (min 5 (- severity 3)))
+						)
+					(cwpSetCaptainTarget gSource Nil)
+					)
+			</OnDeployStrikeForce>
+			<OnSquadronReady>
+				(block
+					(
+						(behavior (objGetData gSource "&evCommPoliceCaptain;_behavior"))
+						(target (objGetObjRefData gSource "&evCommPoliceCaptain;_target"))
+						(station (objGetObjRefData gSource "&evCommPoliceCaptain;_station"))
+						(home (objGetObjRefData gSource "&evCommPoliceCaptain;_home"))
+						)
+					<!--	--
+					(prnAll (cat "Target: " (objGetName target)))
+					(prnAll (cat "Station: " (objGetName station)))
+					<!--	-->
+					(switch
+						target
+							(objSetData gSource "&evCommPoliceCaptain;_behavior" 'actPursueTarget)
+							
+						(eq behavior 'normal)
+							Nil
+							
+						station
+							(block Nil
+								(objSetData gSource "&evCommPoliceCaptain;_behavior" 'normal)
+								(shpOrder gSource 'orbit station 100)
+								)
+								
+						home
+							(block Nil
+								(objSetData gSource "&evCommPoliceCaptain;_behavior" 'normal)
+								(shpOrder gSource 'orbit home 20)
+								(objSendMessage gPlayerShip gSource (cat (objGetName gSource) " to " (objGetName home) ": I have backup.<!-- Returning to base.-->"))
+								)
+								
+						(setq home (sysFindObject gSource "TA +commonwealth;"))
+							(block Nil
+								(objSetData gSource "&evCommPoliceCaptain;_behavior" 'normal)
+								(shpOrder gSource 'orbit home 20)
+								(objSetObjRefData gSource "&evCommPoliceCaptain;_home" home)
+								(objSetObjRefData home "commonPoliceCaptain" gSource)
+								)
+						(block
+							(
+								(combatPower (objGetCombatPower gSource))
+								)
+							(objSetData gSource "&evCommPoliceCaptain;_behavior" 'normal)
+							(enum
+								(filter
+									(sysFindObject gSource "TsA E -uncharted;")
+									theObject
+									(ls (objGetCombatPower theObject) combatPower)
+									)
+								theObject
+								(shpOrder 'attack gSource theObject)
+								)
+							)
+						)
+					)
+			</OnSquadronReady>
+			<OnBehavior>
+				(block
+					(
+						(behavior (objGetData gSource "&evCommPoliceCaptain;_behavior"))
+						(target (objGetObjRefData gSource "&evCommPoliceCaptain;_target"))
+						)
+					(prnEventStart "&evCommPoliceCaptain;_OnBehavior")
+					(switch
+						(eq behavior 'normal)
+							(objFireEvent gSource "OnNormal")
+						)
+					(prnEventEnd "&evCommPoliceCaptain;_OnBehavior")
+					)
+			</OnBehavior>
+			<OnNormal>
+				(block
+					(
+						targets
+						officer
+						threat
+						otherCaptain
+						)
+						
+					(prnEventStart "&evCommPoliceCaptain;_OnNormal")
+					(if (setq targets (filter (sysFindObject gSource "TsA E P") theEnemy
+							(not (sysFindObject gSource "sA X J:&svCommonwealth;"))
+							))
+						(enum targets theEnemy
+							(block	(
+										(officersNeeded (cwpGetOfficersNeeded gSource theEnemy))
+										)
+								(enum officersNeeded theOfficer
+									(shpOrderImmediate theOfficer 'attack theEnemy)
+									)
+								(if officersNeeded
+									(objSendMessage gPlayerShip gSource (cat (objGetName gSource) " to " (objListToString officersNeeded) ": Destroy nearby hostiles."))
+									)
+								)
+							)
+						)
+					
+					
+					(if (and
+							(setq targets (filter (sysFindObject gSource "* P +unid:&stGenericCargoCrate;") theCrate
+								<!--
+								(and (objGetItems theCrate "* +illegal") (not (sysFindObjectOrder theCrate "sA J:&svCommonwealth;" 'loot theCrate)))
+								-->
+								(not (sysFindObjectOrder theCrate "sA J:&svCommonwealth;" 'loot theCrate))
+								))
+							(setq officer (cwpGetIdleOfficer gSource))
+							)
+						(enum targets theCrate
+							(block Nil
+								(shpOrderImmediate officer 'loot theCrate)
+								(objSendMessage gPlayerShip gSource (cat (objGetName gSource) " to " (objGetName officer) ": Remove cargo crate"))
+							))
+						)
+					
+					(if (and
+							(setq targets (filter (sysFindObject gSource "TK P +shipwreck;") theShipwreck
+								(not (sysFindObjectOrder theShipwreck "sA J:&svCommonwealth;" Nil theShipwreck)) 
+								))
+							(setq officer (cwpGetIdleOfficer gSource))
+							)
+						(enum targets theShipwreck
+							(block Nil
+								(shpOrderImmediate officer 'attack theShipwreck)
+								(shpOrderImmediate officer 'loot theShipwreck)
+								(objSendMessage gPlayerShip gSource (cat (objGetName gSource) " to " (objGetName officer) ": Remove shipwreck"))
+								)
+							)
+						)
+					(switch
+						(gr
+							(random 0 (cwpGetReinforcementCount))
+							(count (cwpGetOfficers gSource))
+							)
+							(objFireEvent gSource "OnSquadronCheck")
+							
+						(gr
+							(count (cwpGetOfficers gSource))
+							(cwpGetReinforcementCount)
+							)
+							(objFireEvent gSource "OnDismissOfficers")
+
+						(setq target (match
+							(sysFindObject gSource "TsA N:300; S:d")
+							theEnemy
+							(and
+								(cmwGetKnownCrimes theEnemy)
+								(not (cwpTargetIsUnderPursuit theEnemy))
+								)
+							))
+							(switch
+								(cwpTargetStrikeCheck target)
+									(cwpOrderStrikeForce gSource target)
+								(cwpOrderPursueTarget gSource target)
+								)
+						)
+					
+					;Automatically send officers to clean up crates
+					(prnEventEnd "&evCommPoliceCaptain;_OnNormal")
+					)
+			</OnNormal>
+			<OnPursuePlayer>
+				(block
+					(
+						(behavior (cwpGetCaptainBehavior gSource))
+						)
+						
+					(prnEventStart "&evCommPoliceCaptain;_OnPursuePlayer")
+					(switch
+						;If there's no player or if the player's crimes have been resolved, we are done.
+						(not (or gPlayerShip (cmwGetKnownCrimes gPlayerShip)))
+							(objFireEvent gSource "OnTargetNeutralized")
+						(eq behavior 'actAttackPlayer)
+							Nil
+						(gr (objGetData gSource 'targetResistance) 10)
+							(block Nil
+								(shpOrderImmediate gSource 'attack gPlayerShip)
+								(cwpOrderOfficersAttack gSource gPlayerShip)
+								(objSendMessage gPlayerShip gSource "Initiating Code Red!")
+								(objSetData gSource 'targetResistance 0)
+								(cwpSetCaptainBehavior gSource 'actAttackPlayer)
+								)
+						(eq behavior 'actPursueTarget)
+							(switch
+								(ls (objGetDistance gSource gPlayerShip) 100)
+									(block
+										(
+											(officers (cwpGetOfficers gSource))
+											(officersCount (count officers))
+											(surroundInterval (divide 360 officersCount))
+											)
+										(prnEventStart "Commonwealth Police: Pursued Target")
+										(shpCancelOrders gSource)
+										(shpOrder gSource 'orbit gPlayerShip 50)
+										
+										(enum
+											(filter
+												(sysFindObject gPlayerShip "sA X J:&svCommonwealth;")
+												theShip
+												(and (not (eq theShip gSource)) (not (objGetData theShip 'commStrikeForce)))
+												)
+											theShip
+											(shpCancelOrders theShip)
+											)
+										
+										(for i 0 (subtract officersCount 1)
+											(block
+												(
+													(ship (@ officers i))
+													)
+												(shpCancelOrders ship)
+												(shpOrder ship 'gotoPos (sysVectorPolarOffset gPlayerShip (multiply surroundInterval i) 90))
+												(shpOrder ship 'orbit gPlayerShip 90)
+												)
+											)
+										(cwpSetCaptainBehavior gSource 'msgYouAreSurrounded)
+										(prnEventEnd "Commonwealth Police: Pursued Target")
+										)
+								(not (eq (shpGetOrder gSource) 'approach))
+									(block Nil
+										(prnEventStart "Commonwealth Police: Pursuing Target")
+										(shpCancelOrders gSource)
+										(shpOrder gSource 'approach gPlayerShip 75)
+										(shpOrder gSource 'sendMessage gPlayerShip "We are the Commonwealth police!")
+										(shpOrder gSource 'fireEvent gSource 'OnPursuePlayer)
+										(prnEventEnd "Commonwealth Police: Pursuing Target")
+										)
+								)
+							
+						(eq behavior 'msgYouAreSurrounded)
+							(block Nil
+								(objSendMessage gPlayerShip gSource "You are surrounded on all sides!")
+								(cwpSetCaptainBehavior gSource 'msgYouAreUnderArrest)
+								)
+								
+						(eq behavior 'msgYouCannotRun)
+							(if (gr (sysVectorSpeed (objGetVel gPlayerShip)) 0)
+								(block Nil
+									(objSendMessage gPlayerShip gSource "Stop your ship! You cannot escape the law!")
+									(objIncData gSource 'targetResistance 2)
+									)
+								(cwpSetCaptainBehavior gSource 'msgYouAreUnderArrest)
+								)
+							
+						(eq behavior 'msgYouAreUnderArrest)
+							(if (gr (sysVectorSpeed (objGetVel gPlayerShip)) 0)
+								(block Nil
+									(objSendMessage gPlayerShip gSource "Surrender at once!")
+									(cwpSetCaptainBehavior gSource 'msgYouCannotRun)
+									(objIncData gSource 'targetResistance 2)
+									)
+								(block Nil
+									(objSendMessage gPlayerShip gSource (cat "You are under arrest for " (cmwGetCrimesDesc (cmwGetKnownCrimes gPlayerShip)) "!"))
+									(cwpSetCaptainBehavior gSource 'msgDisableYourWeapons)
+									)
+								)
+						(eq behavior 'msgDoNotResist)
+							(if
+								(and
+									(gr (subtract (unvGetTick) (objGetData gSource "&evCommPoliceCaptain;_lastAttackedTick_gPlayerShip")) 150)
+									(or
+										(not (objGetData gSource "&evCommPoliceCaptain;_lastDestroyedTick_gPlayerShip"))
+										(gr (subtract (unvGetTick) (objGetData gSource "&evCommPoliceCaptain;_lastDestroyedTick_gPlayerShip")) 450)
+										)
+									)
+								(objSetData gSource "&evCommPoliceCaptain;_behavior" (objGetData gSource "&evCommPoliceCaptain;_behavior_previous"))
+								)
+						(eq behavior 'msgDisableYourWeapons)
+							(block
+								(
+									(device
+										(match
+											(objGetItems gPlayerShip "dI")
+											theItem
+											(and
+												(itmGetProperty theItem 'canBeDisabled)
+												(objGetItemProperty gPlayerShip theItem 'enabled)
+												)
+											)
+										)
+									)
+								(if device
+									(block Nil
+										(objSendMessage gPlayerShip gSource (cat "Disable your " (itmGetName device 0x100) " and we can settle this peacefully!"))
+										(objIncData gSource 'targetResistance 1)
+										)
+									(block
+										(
+											(court (sysFindObject gSource "TA N +commonwealth;"))
+											)
+										(objSetObjRefData gSource "&evCommPoliceCaptain;_court" court)
+										(objSendMessage gPlayerShip gSource (cat "Follow us to the " (objGetName court 0x0001)))
+										(objSetData gSource "&evCommPoliceCaptain;_behavior" 'msgFollowUs)
+										(shpOrder gSource 'goto court)
+										)
+									)
+								)
+						(eq behavior 'msgFollowUs)
+							(switch
+								(gr (objGetDistance gSource gPlayerShip) 150)
+									(if (shpGetOrderDescEquals gSource 'goto (objGetObjRefData gSource "&evCommPoliceCaptain;_court"))
+										(block Nil
+											(shpOrderImmediate gSource 'orbit gPlayerShip 50)
+											(objSendMessage gPlayerShip gSource (cat "Do not attempt to flee!"))
+											(objIncData gSource 'targetResistance 3)
+											)
+										)
+								(shpGetOrderDescEquals gSource (list 'orbit gPlayerShip))
+									(if (gr (objGetSpeed gPlayerShip) 0)
+										(block Nil
+											(objSendMessage gPlayerShip gSource (cat "Stop your ship and do not attempt to flee!"))
+											(objIncData gSource 'targetResistance 3)
+											)
+										(block
+											(
+												(court (objGetObjRefData gSource "&evCommPoliceCaptain;_court"))
+												)
+											(shpCancelOrders gSource)
+											(objSendMessage gPlayerShip gSource (cat "Follow us to the " (objGetName court 0x0001) "."))
+											(shpOrder gSource 'approach court 30)
+											(shpOrder gSource 'hold)
+											)
+										)
+								(block
+									(
+										(court (objGetObjRefData gSource "&evCommPoliceCaptain;_court"))
+										)
+									(if (ls (objGetDistance gSource court) 50)
+										(block Nil
+											(shpCancelOrders gSource)
+											(shpOrder gSource 'hold)
+											(objSendMessage gPlayerShip gSource (cat "Dock with the " (objGetName court 0x0001) "."))
+											(objIncData gSource 'targetResistance 1)
+											)
+										)
+									)
+								)
+						)
+						
+					(prnEventEnd "&evCommPoliceCaptain;_OnPursuePlayer")
+					)
+			</OnPursuePlayer>
+			<OnPursueNPC>
+				(block
+					(
+						(target (objGetObjRefData gSource "&evCommPoliceCaptain;_target"))
+						(behavior (objGetData gSource "&evCommPoliceCaptain;_behavior"))
+						)
+					(prnEventStart "&evCommPoliceCaptain;_OnPursueNPC")
+					(switch
+						(not target)
+							(objFireEvent gSource "OnTargetNeutralized")
+							
+						(or (not behavior) (eq behavior 'actPursueTarget))
+							(if (ls (objGetDistance gSource target) 100)
+								(block
+									(
+										(officers (cwpGetOfficers gSource))
+										(officersCount (count officers))
+										(surroundInterval (divide 360 officersCount))
+										(waitTime
+											(sysCalcTravelTime
+												(add 75 (objGetDistance gSource target))
+												(shpGetMaxSpeed gSource)
+												)
+											)
+										)
+									(shpCancelOrders gSource)
+									(shpOrder gSource 'orbit target 50)
+									
+									(enum
+										(sysFindObject target "sA X J:&svCommonwealth;")
+										theShip
+										(shpCancelOrder theShip)
+										)
+									
+									(for i 0 (subtract officersCount 1)
+										(block
+											(
+												(ship (@ officers i))
+												)
+											(shpCancelOrders ship)
+											;(shpOrder ship 'follow target (multiply surroundInterval i) 90)
+											(shpOrder ship 'gotoPos (sysVectorPolarOffset target (multiply surroundInterval i) 90))
+											(shpOrder ship 'orbit target 90)
+											)
+										;Check if the follow order allows angle and distance parameters
+										)
+									(objSetData gSource "&evCommPoliceCaptain;_behavior_waitTime" (add (unvGetTick) waitTime))
+									(objSetData gSource "&evCommPoliceCaptain;_behavior" 'actSurroundTarget)
+									)
+								(if (not (eq (shpGetOrder gSource) 'approach))
+									(block Nil
+										(shpCancelOrders gSource)
+										(shpOrder gSource 'approach target 75)
+										)
+									)
+								)
+								
+						(eq behavior 'actSurroundTarget)
+							(if (gr (unvGetTick) (objGetData gSource "&evCommPoliceCaptain;_behavior_waitTime"))
+								(block Nil
+									(objSetData gSource "&evCommPoliceCaptain;_behavior" 'actAttackTarget)
+									<!--(prnAll "Ready")-->
+									)
+								<!--(prnAll "Wait")-->
+								)
+								
+						(eq behavior 'actAttackTarget)
+							(block Nil
+								(shpCancelOrders gSource)
+								(shpOrder gSource 'attack target)
+								(enum (cwpGetOfficers gSource) theShip
+									(block Nil
+										(shpCancelOrders theShip)
+										(shpOrder theShip 'attack target)
+										(shpSetAISetting theShip 'fireRateAdj 10)
+										)
+									)
+								(objSetData gSource "&evCommPoliceCaptain;_behavior" 'actAttacking)
+								<!--(prnAll "Attack")-->
+								)
+							
+						)
+					(prnEventEnd "&evCommPoliceCaptain;_OnPursueNPC")
+					)
+			</OnPursueNPC>
+			<OnTargetNeutralized>
+				(block Nil
+					(objSetData gSource "&evCommPoliceCaptain;_behavior" 'normal)
+					(objSetData gSource 'targetResistance 0)
+					)
+			</OnTargetNeutralized>
+			<OnObjDestroyed>
+				(if (eq aObjDestroyed (objGetObjRefData gSource "&evCommPoliceCaptain;_target"))
+					(objFireEvent gSource "OnTargetNeutralized")
+					)
+			</OnObjDestroyed>
+			<!--
+			<OnOfficerAttacked>
+				(cwpOnAttacked gSource aOrderGiver)
+			</OnOfficerAttacked>
+			-->
+			<OnAttacked>
+				(cwpOnAttacked gSource aOrderGiver aDamageHP aWeaponType)
+			</OnAttacked>
+			<OnDestroy>
+				(if (not (eq aDestroyReason 'enteredStargate))
+					(block
+						(
+							<!--
+							(threatLevel (cwpGetThreatLevel aOrderGiver))
+							(newThreatLevel (find (list &scRoninB; &scWolfen; &scAsterionHeavyGunship; &scRoninC; &scManticore; &scCenturion; &scBritannia;) (objGetType gSource)))
+							--><!--
+							(chief (cwpGetChief))
+							-->
+							<!--
+								(match (sysFindObject gSource "TsA +commonwealth; S:d; N:300;") theObject (or (not (objIsShip theObject)) (eq (objGetEventHandler theObject) &evCommPoliceCaptain;)))
+								-->
+							<!--
+							(captain (match (sysFindObject gSource "sA J:&svCommonwealth;") theShip (eq (objGetData theShip "&evCommPoliceCaptain;_behavior") 'normal)))
+							-->
+							)
+					
+						(prnEventStart "&evCommPoliceCaptain;_OnDestroy")
+						(cwpStrikeForceCheck)
+						(cmwCrime aOrderGiver 3 "the killing of a Commonwealth police captain" 'murder gSource)
+						(cwpOrderOfficersAttack gSource aDestroyer)
+						(prnEventEnd "&evCommPoliceCaptain;_OnDestroy")
+						)
+					)
+			</OnDestroy>
+		</Events>
+	</ShipClass>
+	
+	;(print "&lt;--Event--&gt;")
+	;(print "--&gt;Event&lt;--")
+	
+	<ShipClass UNID="&evCommPoliceOfficer;"
+			class=				"(commonwealth police officer behavior)"
+			virtual=			"true"
+			
+			attributes=			"behaviorClass"
+			>
+
+		<Events>
+			<OnCreate>
+				(block Nil
+					(shpInstallNewDevice gSource (itmCreate &itTritiumPropulsionUpgrade; 1))
+					(objEnumItems gSource "*I" theItem
+						(shpEnhanceItem gSource theItem 0x0102)
+						)
+					)
+			</OnCreate>
+			<OnAttacked>
+				(if (setq aCaptainObj (objGetObjRefData gSource "&evCommPoliceOfficer;_captain"))
+					(cwpOnAttacked aCaptainObj aOrderGiver aDamageHP aWeaponType)
+					)
+			</OnAttacked>
+			<OnDestroy>
+				(if (and (not (eq aDestroyReason 'enteredStargate)) (setq aCaptainObj (objGetObjRefData gSource "&evCommPoliceOfficer;_captain")))
+					(cwpOnOfficerDestroyed aCaptainObj aOrderGiver)
+					)
+			</OnDestroy>
+		</Events>
+	</ShipClass>
+	
+	<StationType unid="&baCommonwealthStation;"
+			name=			"(Commonwealth station base class)"
+			virtual=		"true"
+			>
+		
+		<Events>
+			<OnCreate>
+				(cmwOnCreate)
+			</OnCreate>
+			<OnBehavior>
+				(block (target)
+					;Strike a target or create a new captain
+					(switch
+						(setq target (match (sysFindObject gSource "s A N:150;") theShip (cwpTargetStrikeCheck theShip)))
+							;(objSendMessage gPlayerShip gSource (cat "Strike Target: " (objGetName target)))
+							(cwpCreateStrikeForce target (min 5 (- (cmwGetPunishmentSeverity (cmwGetKnownCrimes target)) 3)))
+						(cmwNeedsPoliceCaptain gSource)
+							(cmwCreatePoliceCaptain)
+						)
+					)
+			</OnBehavior>
+			<OnAttacked>
+				(if (and (not (objGetProperty gSource 'abandoned)) (eq aOrderGiver gPlayerShip))
+					(cmwOnAttackedByPlayer)
+					)
+			</OnAttacked>
+			<OnPlayerCeaseFireCheck>
+				(cmwOnPlayerCeaseFireCheck)
+			</OnPlayerCeaseFireCheck>
+			<OnDestroy>
+				(cmwOnDestroy)
+			</OnDestroy>
+		</Events>
+	</StationType>
+	<ShipTable UNID="&etCommStrikeForce1;">
+		<Ship	count="1"	class="&scWolfen;"	orders="attack"	sovereign="&svCommonwealth;"	eventHandler="&evCommStrikeCaptain;">
+			<Items>
+				<Item	count="20-40"	item="&itKM550Missile;"/>
+			</Items>
+			<Escorts>
+				<Ship	count="2"	class="&sc300DDefenderAuton;"	orders="escort"	eventHandler="&evCommStrikeOfficer;"/>
+				<Ship	count="3-5"	class="&scRoninB;"				orders="escort"	eventHandler="&evCommStrikeOfficer;">
+					<Items>
+						<Item	count="30-60"	item="&itKM120Missile;"/>
+					</Items>
+				</Ship>
+			</Escorts>
+		</Ship>
+	</ShipTable>
+	
+	<ShipTable UNID="&etCommStrikeForce2;">
+		<Ship	count="1"	class="&scRoninC;"	orders="attack"	sovereign="&svCommonwealth;"	eventHandler="&evCommStrikeCaptain;">
+			<Escorts>
+				<Ship	count="4-6"	class="&scAsterionHeavyGunship;"	orders="escort"	eventHandler="&evCommStrikeOfficer;"/>
+				<Ship count="2" class="&sc1MBattleAuton;" orders="escort"	eventHandler="&evCommStrikeOfficer;"/>
+			</Escorts>
+			<Items>
+				<Item	count="50-90"	item="&itKM550Missile;"	eventHandler="&evCommStrikeOfficer;"/>
+			</Items>
+		</Ship>
+	</ShipTable>
+	<ShipTable UNID="&etCommStrikeForce3;">
+		<Ship	count="1"	class="&scManticore;"	orders="attack"	sovereign="&svCommonwealth;"	eventHandler="&evCommStrikeCaptain;">
+			<Escorts>
+				<Ship	count="3-6"	class="&scRoninC;"	orders="escort"	eventHandler="&evCommStrikeOfficer;">
+					<Items>
+						<Item	count="70-150"	item="&itXM900Missile;"/>
+					</Items>
+				</Ship>
+				<Ship	count="2" class="&sc1MiBattleAuton;" orders="escort"	eventHandler="&evCommStrikeOfficer;"/>
+			</Escorts>
+			<OnCreate>
+				(block Nil
+					(typFireObjEvent &evCommStrikeCaptain; gSource 'OnCreate)
+					(objEnumItems gSource "wI" theWeapon
+						(objRemoveItem gSource (shpRemoveDevice gSource theWeapon))
+						)
+					(shpInstallNewDevice gSource (itmCreate &itMarkVHowitzer; 1))
+					(shpInstallNewDevice gSource (itmCreate &itCyclotronDeflectorIV; 1))
+					(shpInstallNewDevice gSource (itmCreate &itMakayevLauncher; 1))
+					(objAddItem gSource (itmCreate &itStrelkaRed; 200))
+					)
+			</OnCreate>
+		</Ship>
+	</ShipTable>
+	<ShipTable UNID="&etCommStrikeForce4;">
+		<Ship	count="1"	class="&scCenturion;"	orders="attack"	sovereign="&svCommonwealth;"	eventHandler="&evCommStrikeCaptain;">
+			<Escorts>
+				<Ship	count="3"	class="&scManticore;"	orders="escort"	eventHandler="&evCommStrikeOfficer;">
+					<OnCreate>
+						(block Nil
+							(typFireObjEvent &evCommStrikeOfficer; gSource 'OnCreate)
+							(objEnumItems gSource "wI" theWeapon
+								(objRemoveItem gSource (shpRemoveDevice gSource theWeapon))
+								)
+							(shpInstallNewDevice gSource (itmCreate &itMarkVHowitzer; 1))
+							(shpInstallNewDevice gSource (itmCreate &itCyclotronDeflectorIV; 1))
+							(shpInstallNewDevice gSource (itmCreate &itMakayevLauncher; 1))
+							(objAddItem gSource (itmCreate &itStrelkaRed; 200))
+							)
+					</OnCreate>
+				</Ship>
+				<Ship	count="4"	class="&scCenturion;"	orders="escort"	eventHandler="&evCommStrikeOfficer;"/>
+			</Escorts>
+		</Ship>
+	</ShipTable>
+	<ShipTable UNID="&etCommStrikeForce5;">
+		<Ship	count="1"	class="&scBritannia;"	orders="attack"	sovereign="&svCommonwealth;"	eventHandler="&evCommStrikeCaptain;">
+			<Escorts>
+				<Ship	count="6"	class="&scCenturion;"	orders="escort"	eventHandler="&evCommStrikeOfficer;"/>
+				<Ship	count="2"	class="&scBritannia;"	orders="escort"	eventHandler="&evCommStrikeOfficer;"/>
+			</Escorts>
+		</Ship>
+	</ShipTable>
+	<ShipTable UNID="&etCommStrikeForce6;">
+		<Ship	count="1"	class="&scAquilaCruiser;"	orders="attack"	sovereign="&svCommonwealth;"	eventHandler="&evCommStrikeCaptain;">
+			<Escorts>
+				<Ship	count="8"	class="&scBritannia;"	orders="escort"	eventHandler="&evCommStrikeOfficer;"/>
+			</Escorts>
+		</Ship>
+	</ShipTable>
+	
+	<!-- BASIC COMMONWEALTH RULES
+		PLAYER DATA
+		
+		commonCrime:		A list of structs for every crime that the player has yet to be tried for. Each struct contains the description and severity. Every time the player is punished, all of the player's crimes are cleared and only the known ones are sent to the record.
+			description:		Description of the player's crime (e.g., "slave-trading")
+			severity:			The severity of the crime
+				0	No crime
+				1	Petty Offense
+				2	Misdemeanor (drug possession)
+				3	Felony (piracy)
+				4	Crimes against Humanity (slave-trading, genocide, mass-destruction)
+			category:			Used for grouping multiple similar crimes.
+				'negligence			Friendly fire negligence
+				'hostility			Intentional, nonlethal attacks
+				'murder				Lethal attacks on ships
+				"mass destruction"	Lethal attacks on stations or major ships
+			known:				Whether there were any witnesses to the crime. If True, then the court will use this crime against the player and it will be included in the player's record.
+				
+		commonCrimeRecord:	A list of structs for every crime that the player has been tried for.
+		
+		Punishments - Negligence
+			0			No punishment
+			1			Warning
+			2			
+		Punishments - Trial
+			Severity	Plead Guilty														Plead Not Guilty
+			0			No punishment
+			1			Warning																5000 credit fine
+			2			5000 credit fine | Seize 5000 credits' worth of items | Seize ship	25000 credit fine
+			3			25000 credit fine, seize Military ID and installed weapons			Imprisonment
+			4			Execution, revocation of insurance
+		
+	-->
+	<!-- Commonwealth Imprison -->
+
+	<DockScreen UNID="&dsCommonwealthImprison;"	nestedScreen="true">
+		<InitialPane>
+			(block Nil
+				(setq gCrimes (cmwGetCrimes gPlayerShip))
+				(setq gKnownCrimes (filter gCrimes theCrime (@ theCrime 'known)))
+				(setq gUnknownCrimes (filter gCrimes theCrime (not (@ theCrime 'known))))
+				;The number of crime that will be tried in court
+				(setq gCrimesCount (count gKnownCrimes))
+				(setq gPreviousCrimes (cmwGetCrimesRecord gPlayerShip)) ;Previous crimes for which the player has been tried
+				(setq gPreviousCrimesCount (count gPreviousCrimes))
+				(setq gCrimesDesc (cmwGetCrimesDesc gKnownCrimes))
+				(setq gFlavorModifiers {
+						;If the player destroyed a Metropolis, then we will have an interesting trial
+						destroyedMetropolis: (match gKnownCrimes theCrime
+							(and (strFind (@ theCrime 'description) "Starton") (eq (@ theCrime 'category) "mass destruction"))
+							)
+						
+						;If all of the player's known crimes consisted only of negligence, then the player will be given a warning.
+						negligenceWarningOnly: (apply and (map gKnownCrimes theCrime
+							(eq (@ theCrime 'category) 'negligence)
+							))
+							
+						;If the player commited various, secret murders (usually in order to farm free treasure from NPCs)
+						murderWarningOnly: (and (not gKnownCrimes) (apply and (map gUnknownCrimes theCrime
+							(eq (@ theCrime 'category) 'murder)
+							)))
+						}
+					)
+					
+				;Determines the description of the trial
+				(setq gPunishmentSeverity (int (cmwGetPunishmentSeverity gKnownCrimes)))
+				
+				;A number representing the player's previous criminal history.
+				(setq gPreviousSeverity (int (cmwGetPunishmentSeverity gPreviousCrimes)))
+				
+				<!--
+				(setq gCombinedSeverity (int (cmwGetPunishmentSeverity (append gCrimes gPreviousCrimes))))
+				-->
+				(setq gCombinedSeverity (add gPunishmentSeverity gPreviousSeverity))
+				;This screen is meant to resolve all of the player's current crimes, so clear them now
+				(cmwClearCrimes gPlayerShip)
+				(cmwAddCrimesToRecord gPlayerShip gKnownCrimes)
+				
+				;The player is receiving justice, so call off all angry friendlies.
+				(enum (sysFindObject gPlayerShip "sA X J:&svCommonwealth; -auton; -zoanthrope;") theShip (shpCancelOrders theShip))
+				
+				(switch
+					(@ gFlavorModifiers 'destroyedMetropolis)
+						"Metropolis_1A"
+						
+					;A special case. If the player was negligent and has already received three warnings, then no more warnings.
+					(and	 (@ gFlavorModifiers 'negligenceWarningOnly)	(ls (objGetData gPlayerShip 'negligenceWarnings) 3)	)
+						(cat "Negligence_"	(objIncData gPlayerShip 'negligenceWarnings)	"A")
+						
+					;A special case. The player gets killed after the third one.
+					(and 	(@ gFlavorModifiers 'murderWarningOnly)			(ls (objGetData gPlayerShip 'murderWarnings) 3)		)
+						(cat "Murder_"		(objIncData gPlayerShip 'murderWarnings)		"A")
+						
+					(eq gCombinedSeverity 1)
+						"Citation"
+						
+						;Regular case.
+						"Trial_Part_1"
+					)
+				)
+		</InitialPane>
+		<Panes>
+			<Murder_1A>
+				<OnPaneInit>
+					(scrSetDesc gScreen
+						"As you enter the docking bay, a crying boy runs up to you and yells at you."
+						"\n\n"
+						"\"You made my dad's ship blow up, and now he won't say anything! YOU MADE HIS SHIP BLOW UP!!!\""
+						"\n\n"
+						"The boy screams for his dad as he continues to weep."
+						"\n\n"
+						"He kicks you in the shin as hard as he can before running off. He vanishes around a corner as you fall to the floor in pain."
+						)
+				</OnPaneInit>
+				<Actions>
+					<Action name="Continue" default="1" cancel="1" key="C">
+						(block Nil
+							(scrExitScreen gScreen)
+							)
+					</Action>
+				</Actions>
+			</Murder_1A>
+			<Murder_2A>
+				<OnPaneInit>
+					(scrSetDesc gScreen
+						"Upon entering the docking bay, you hear a voice whisper into your ear from behind you."
+						"\n\n"
+						"\"I saw what you did. Do it again and I will do the same to you.\""
+						"\n\n"
+						"You turn around and see nobody there."
+						)
+				</OnPaneInit>
+				<Actions>
+					<Action name="Continue" default="1" cancel="1" key="C">
+						(block Nil
+							
+							(scrExitScreen gScreen)
+							)
+					</Action>
+				</Actions>
+			</Murder_2A>
+			<Murder_3A>
+				<OnPaneInit>
+					(scrSetDesc gScreen
+						"Right when you leave your ship, a well-dressed man greets you at the docking bay."
+						"\n\n"
+						"Hello, " (plyComposeString gPlayer "%sir%") ", I hear that you have valuable information regarding my family's mysterious disappearance."
+						)
+				</OnPaneInit>
+				<Actions>
+					<Action name="Who?" default="1" cancel="1" key="C">
+						<ShowPane pane="Murder_3B"/>
+					</Action>
+				</Actions>
+			</Murder_3A>
+			<Murder_3B>
+				<OnPaneInit>
+					(scrSetDesc gScreen
+						"The man grabs you by the collar and pulls you close."
+						"\n\n"
+						"\"So, you were too busy murdering people for their treasures to notice that those were real lives you were taking, weren't you?\""
+						"\n\n"
+						"\"I know that you killed my family. The question is, are you really the cold-blooded killer I think you are?\""
+						)
+				</OnPaneInit>
+				<Actions>
+					<Action name="Ummm" default="1" cancel="1" key="U">
+						<ShowPane pane="Murder_3C"/>
+					</Action>
+				</Actions>
+			</Murder_3B>
+			<Murder_3C>
+				<OnPaneInit>
+					(scrSetDesc gScreen
+						"\"Well then, this one is for my mother.\" The man lets go of you and throws a powerful punch directly to your nose."
+						"\n\n"
+						"You are knocked back by the impact."
+						"\n\n"
+						"\"And this is for my father!\""
+						"He kicks you in the head. You are stunned."
+						)
+				</OnPaneInit>
+				<Actions>
+					<Action name="Continue" default="1" cancel="1" key="U">
+						<ShowPane pane="Murder_3D"/>
+					</Action>
+				</Actions>
+			</Murder_3C>
+			<Murder_3D>
+				<OnPaneInit>
+					(scrSetDesc gScreen
+						"People nearby witness the attack and run towards the man. Before they can restrain him, the man kicks you in the neck."
+						"\"AND THIS FOR MY SON!\""
+						"\n\n"
+						"\"STOP!\" shouts a Commonwealth officer at the man."
+						"\n\n"
+						"But you are already dead."
+						)
+				</OnPaneInit>
+				<Actions>
+					<Action name="Continue" default="1" cancel="1" key="U">
+						(block Nil
+							(plyDestroyed gPlayer "was beaten to death")
+							(scrExitScreen gScreen 'forceUndock)
+							)
+					</Action>
+				</Actions>
+			</Murder_3D>
+			<Negligence_1A>
+				<OnPaneInit>
+					(scrSetDesc gScreen
+						"A Commonwealth officer meets you at the docking bay."
+						"\n\n"
+						"\"Sir, we have "
+						(if (gr gCrimesCount 1)
+							(cat gCrimesCount "complaints")
+							"1 complaint"
+							)
+						" of friendly fire negligence. This is your first warning. Please be careful next time.\""
+						"\n\n"
+						"The officer leaves."
+						)
+				</OnPaneInit>
+				<Actions>
+					<Action name="Continue" default="1" cancel="1" key="C">
+						(block Nil
+							(scrExitScreen gScreen)
+							)
+					</Action>
+				</Actions>
+			</Negligence_1A>
+			<Negligence_2A>
+				<OnPaneInit>
+					(scrSetDesc gScreen
+						"Several Commonwealth officers stop you at the docking bay."
+						"\n\n"
+						"\"Sir, we have "
+						(if (gr gCrimesCount 1)
+							(cat gCrimesCount " more complaints")
+							"1 more complaint"
+							)
+						" of friendly fire negligence. We will have to fine you 10000 credits in damages. This is your last warning to aim carefully.\""
+						"\n\n"
+						"The officer leaves."
+						)
+				</OnPaneInit>
+				<Actions>
+					<Action name="Continue" default="1" cancel="1" key="C">
+						(block Nil
+							(scrExitScreen gScreen)
+							)
+					</Action>
+				</Actions>
+			</Negligence_2A>
+			<Negligence_3A>
+				<OnPaneInit>
+					(scrSetDesc gScreen
+						"A Commonwealth police captain, escorted by several police officers, stands at the docking bay and steps in front of you."
+						"\n\n"
+						"\"The people of the Commonwealth have no use for your reckless aiming. Why don't you learn to be more careful next time? Maybe you should just stick to civilian work from now on."
+						(if (setq gMilitaryID (@ (objGetItems gPlayerShip "* +MilitaryID;") 0))
+							" You are hereby discharged from the Commonwealth Militia."
+							)
+						"\""
+						"\n\n"
+						(if (setq gMilitaryItems (objGetItems gPlayerShip "*U +Military;"))
+							(cat "The captain orders his officers to confiscate all military items from your cargo hold.")
+							)
+						)
+				</OnPaneInit>
+				<Actions>
+					<Action name="Continue" default="1" cancel="1" key="C">
+						(block Nil
+							(enum gMilitaryItems theItem
+								(objRemoveItem gPlayerShip theItem)
+								)
+							(scrExitScreen gScreen)
+							)
+					</Action>
+				</Actions>
+			</Negligence_3A>
+			<Metropolis_1A>
+				<OnPaneInit>
+					(scrSetDesc gScreen
+						(plyComposeString gPlayer (cat
+							"When you exit your ship, a nearby Commonwealth officer exclaims \"%he%&apos;s here!\" You are immediately surrounded by squad of soldiers from Special Forces. A police chief steps forward."
+							"\n\n"
+							"\"%name%, on behalf of the Commonwealth, you are under arrest for the destruction of a Commonwealth Metropolis and the genocide of millions of Commonwealth citizens.\""
+							))
+						)
+				</OnPaneInit>
+					<Actions>
+						<Action name="Continue" default="1" cancel="1" key="C">
+							<ShowPane pane="Metropolis_1B"/>
+						</Action>
+					</Actions>
+			</Metropolis_1A>
+			<Metropolis_1B>
+				<OnPaneInit>
+					(scrSetDesc gScreen
+						"You soon appear in what seems to be a large tribunal hall. The judge announces your charges. \"You are accused of high treason against the Commonwealth for your acts of genocide. How do you plead?\""
+						"\n\n"
+						"You do not really have a choice. Regardless of your plea, you will be executed."
+						)
+				</OnPaneInit>
+					<Actions>
+						<Action name="Guilty" default="1" cancel="1" key="G">
+							<ShowPane pane="Metropolis_1C"/>
+						</Action>
+						<Action name="Not Guilty" key="N">
+							<ShowPane pane="Metropolis_1C"/>
+						</Action>
+						<Action name="Not Guilty By Reason Of Insanity" key="I">
+							<ShowPane pane="Metropolis_1C_Insanity"/>
+						</Action>
+						<Action name="No Contest" key="C">
+							<ShowPane pane="Metropolis_1C"/>
+						</Action>
+					</Actions>
+			</Metropolis_1B>
+			<Metropolis_1C_Insanity>
+				<OnPaneInit>
+					(scrSetDesc gScreen
+						"You suddenly begin screaming out \"Domina made me do it!\" and the judge appears visibly disturbed as your voice rings throughout the courtroom. You are immediately restrained by the security guards as you attempt to flee the trial yelling \"Save me, Domina!\" The judge orders for you to be kept at a Commonwealth rehabilitation colony for the rest of your life. An armored passenger freighter transports you to the colony."
+						)
+				</OnPaneInit>
+				<Actions>
+					<Action name="Continue" key="C">
+						<ShowPane pane="Metropolis_1D"/>
+					</Action>
+				</Actions>
+			</Metropolis_1C_Insanity>
+			<Metropolis_1D_Insanity>
+				<OnPaneInit>
+					(scrSetDesc gScreen
+						"You are immediately taken to the colony&apos;s psychiatric ward, where you are chained to the nearest wall. The visibly stressed psychiatrists have no idea what to do as you cry out that you must travel to the core. Every day, your cries remain ignored as your invitation to meet Domina is taken from you. Perhaps, as the psychiatrists tell you, that dream was nothing more than a dream after all."
+						)
+				</OnPaneInit>
+				<Actions>
+					<Action name="Continue" key="C">
+						(block Nil
+							(plyDestroyed gPlayer "was sent to a Commonwealth rehabilitation colony for treason, genocide, and the destruction of a Commonwealth Metropolis.")
+							(scrExitScreen gScreen 'forceUndock)
+							)
+					</Action>
+				</Actions>
+			</Metropolis_1D_Insanity>
+			<Metropolis_1C>
+				<OnPaneInit>
+					(scrSetDesc gScreen
+						"You attempt to make your plea, but you give up immediately, instead preferring to stare into the nothingness ahead. The Court conducts an extremely lengthy trial in which numerous samples of security footage are played out. All of them show your ship firing at a metropolis. All of them show the gigantic explosion resulting from the destruction of the metropolis. The Court eventually delivers a verdict."
+						)
+				</OnPaneInit>
+				<Actions>
+					<Action name="Continue" key="C">
+						<ShowPane pane="Metropolis_1D"/>
+					</Action>
+				</Actions>
+			</Metropolis_1C>
+			<Metropolis_1D>
+				<OnPaneInit>
+					(scrSetDesc gScreen
+						"The jury unanimously approves of capital punishment in the form of execution by shooting squad. After the trial, you are transported to a maximum-security prison for death row; the inmates are silent as you are taken to a heavily guarded cell."
+						)
+				</OnPaneInit>
+				<Actions>
+					<Action name="Continue" key="C">
+						<ShowPane pane="Metropolis_1E"/>
+					</Action>
+				</Actions>
+			</Metropolis_1D>
+			<Metropolis_1E>
+				<OnPaneInit>
+					(scrSetDesc gScreen
+						"In a few days, you will be formally executed. News of your atrocities will travel throughout the universe as you are declared the most soulless monster in all human history. Some people will believe that you were a Penitent. Some will call you an Ares spy. Others will label you as a traitor. It is inevitable that a number of people will blame the Sisters of Domina and call for the removal of all pilgrims. Either way, you will be dead."
+						)
+				</OnPaneInit>
+				<Actions>
+					<Action name="Continue" key="C">
+						(block Nil
+							(plyDestroyed gPlayer "was executed for treason, genocide, and the destruction of a Commonwealth Metropolis.")
+							(scrExitScreen gScreen 'forceUndock)
+							)
+					</Action>
+				</Actions>
+			</Metropolis_1E>
+			<Citation>
+				<OnPaneInit>
+					(scrSetDesc gScreen
+						"An officer meets you as you leave your ship."
+						"\n\n"
+						"\"You have received " (if (gr gCrimesCount 1) "citations" "citation") " for " gCrimesDesc "."
+						"\n\n"
+						"The officer leaves."
+						)
+				</OnPaneInit>
+				<Actions>
+					<Action name="Continue" default="1" cancel="1" key="C">
+						<Exit/>
+					</Action>
+				</Actions>
+			</Citation>
+			<Trial_Part_1>
+				<OnPaneInit>
+					(scrSetDesc gScreen 
+						"As you enter the station you are surrounded by heavily armed soldiers. "
+						"A Commonwealth official approaches you:\n\n"
+						"\""
+						(plyComposeString gPlayer "%name%")
+						", you are under arrest."
+						".\"" 
+						)
+				</OnPaneInit>
+
+				<Actions>
+					<Action name="Continue" default="1" cancel="1" key="C">
+						<ShowPane pane="Trial_Part_2"/>
+					</Action>
+				</Actions>
+			</Trial_Part_1>
+			
+			<Trial_Part_2>
+				<OnPaneInit>
+					(scrSetDesc gScreen
+						"You appear before a magistrate who reads out the charges:\n\n"
+						"\"%name%, you are accused of " gCrimesDesc ". "
+						"How do you plead?\""
+						)
+				</OnPaneInit>
+				
+				<Actions>
+					<Action name="Guilty" default="1" cancel="1" key="G">
+						<!--
+						(block Nil
+							(setq gResult (cat
+								"You have no choice. After all, the Court knows about what you have done. At the end of an extremely lengthy trial in which nothing happens, the Court finally gets the motivation to make a decision."
+								"\n\n"
+								"\"Since this mod is very incomplete and 0xABCDEF is too lazy to make an actual trial system right now, we're going to let you off with just a warning.\""
+								"\n\n"
+								"You feel extremely guilty."
+								))
+							(scrShowPane gScreen "Verdict")
+							)
+						-->
+						(block (
+									(warning (cat
+										"\"You have already received %1% other citations. As your last warning, the Commonwealth will fine you %2% credits. Learn that there will be severe consequences next time."
+										"\n\n"
+										"\"Court dismissed!\""
+										))
+									(fine_clean_responsibility (cat
+										"\"In view of your otherwise clean record, and your acceptance of responsibility, "
+										"the Commonwealth fines you the sum of %1% credits for your crimes.\n\n"
+										"\"Court dismissed!\""
+										))
+									(fine_clean (cat
+										"\"In view of your otherwise clean record, "
+										"the Commonwealth fines you the sum of %1% credits for your crimes.\n\n"
+										"\"Court dismissed!\""
+										))
+									(fine_responsibility (cat
+										"\"In view of your acceptance of responsibility, "
+										"the Commonwealth fines you the sum of %1% credits for your crimes.\n\n"
+										"\"Court dismissed!\""
+										))
+									(seriousness (cat
+										"\"In view of the seriousness of the crime, the Court sentences you to "
+										"%1% years in a Commonwealth rehabilitation colony.\n\n"
+										"\"Court dismissed!\""
+										))
+									(past_record (cat
+										"\"Your past criminal record gives me no expectation of future good behavior. "
+										"You are hereby sentenced to %1% years in a Commonwealth rehabilitation colony.\n\n"
+										"\"Court dismissed!\""
+										))
+									)
+							(setq gResult
+								(@
+									(@
+										(list
+											(list											;
+												Nil
+												(subst fine_clean_responsibility "5000")
+												(subst fine_clean_responsibility "25000")
+												(subst seriousness "a minimum of ten")
+												)
+											(list
+												(subst warning gPreviousCrimesCount "5000")
+												(subst fine_responsibility "25000")
+												(subst past_record "ten")
+												(subst seriousness "a minimum of fifteen")
+												)
+											(list
+												(subst fine_responsibility "25000")
+												(subst past_record "ten")
+												(subst past_record "fifteen")
+												(subst seriousness "a minimum of twenty")
+												)
+											(list
+												(subst past_record "fifteen")
+												(subst past_record "twenty")
+												(subst past_record "twenty-five")
+												(subst seriousness "life without parole")
+												)
+											)
+										gPreviousSeverity
+										)
+									(- gPunishmentSeverity 1)
+									)
+								)
+							(scrShowPane gScreen "Trial_Part_3")
+							)
+					</Action>
+					
+					<Action name="Not guilty" key="N">
+						(block (
+									(warning (cat
+										"\"You have already received %1% other citations. As your last warning, the Commonwealth will fine you %2% credits. Learn that there will be severe consequences next time."
+										"\n\n"
+										"\"Court dismissed!\""
+										))
+									(fine_clean_responsibility (cat
+										"\"In view of your otherwise clean record, and your acceptance of responsibility, "
+										"the Commonwealth fines you the sum of %1% credits for your crimes.\n\n"
+										"\"Court dismissed!\""
+										))
+									(fine_clean (cat
+										"\"In view of your otherwise clean record, "
+										"the Commonwealth fines you the sum of %1% credits for your crimes.\n\n"
+										"\"Court dismissed!\""
+										))
+									(fine_responsibility (cat
+										"\"In view of your acceptance of responsibility, "
+										"the Commonwealth fines you the sum of %1% credits for your crimes.\n\n"
+										"\"Court dismissed!\""
+										))
+									(seriousness (cat
+										"\"In view of the seriousness of the crime, the Court sentences you to "
+										"%1% years in a Commonwealth rehabilitation colony.\n\n"
+										"\"Court dismissed!\""
+										))
+									(past_record (cat
+										"\"Your past criminal record gives me no expectation of future good behavior. "
+										"You are hereby sentenced to %1% years in a Commonwealth rehabilitation colony.\n\n"
+										"\"Court dismissed!\""
+										))
+									)
+							(setq gResult
+								(@
+									(@
+										(list
+											(list
+												(subst fine_clean "5000")
+												(subst fine_clean "25000")
+												(subst seriousness "a minimum of ten")
+												(subst seriousness "life without parole")
+												)
+											(list
+												(subst fine_clean "25000")
+												(subst past_record "ten")
+												(subst seriousness "a minimum of fifteen")
+												(subst seriousness "life without parole")
+												)
+											(list
+												(subst past_record "ten")
+												(subst past_record "fifteen")
+												(subst seriousness "a minimum of twenty")
+												(subst seriousness "life without parole")
+												)
+											(list
+												(subst past_record "twenty")
+												(subst past_record "twenty-five")
+												(subst seriousness "life without parole")
+												(subst seriousness "life without parole")
+												)
+											)
+										gPreviousSeverity
+										)
+									(- gPunishmentSeverity 1)
+									)
+								)
+							(scrShowPane gScreen "Trial_Part_3")
+							)
+					</Action>
+					<Action name="Not guilty by reason of insanity" key="I">
+						(scrSetDesc gScreen "Nil")
+					</Action>
+					<Action name="No contest" key="C">
+						(scrSetDesc gScreen "Nil")
+					</Action>
+				</Actions>
+			</Trial_Part_2>
+			<Trial_Part_3>
+				<OnPaneInit>
+					(scrSetDesc gScreen gResult)
+				</OnPaneInit>
+				<Actions>
+					<Action name="Continue" key="C" default="1" cancel="1">
+						(scrShowPane gScreen (cat "Trial_" (min 4 gCombinedSeverity) "A"))
+					</Action>
+				</Actions>
+			</Trial_Part_3>
+			
+			<Trial_2A>
+				<OnPaneInit>
+					(block
+						(
+							)
+						(setq gResult (cmwChargePlayer gSource gPlayer gPlayerShip 5000))
+						(scrSetDesc gScreen
+							(switch
+								(eq gResult Nil)
+									(cat
+										"Unfortunately, you cannot afford to pay the fine. "
+										"The Commonwealth decides to sell your ship to cover your debt."
+										)
+								(eq gResult True)
+									(cat
+										"The Commonwealth takes 5000 credits from your account."
+										)
+								(cat
+									"In order to pay your fine, the Commonwealth forces you to sell your " (itmListToString gResult) "."
+									)
+								)
+							)
+						)
+				</OnPaneInit>
+				<Actions>
+					<Action name="Continue" key="C"  default="1" cancel="1">
+						(if gResult
+							(scrExitScreen gScreen)
+							(block Nil
+								(plyDestroyed gPlayer (plyComposeString gPlayer (cat "lost %his% ship after a criminal conviction")))
+								(scrExitScreen gScreen 'forceUndock)
+								)
+							)
+					</Action>
+				</Actions>
+			</Trial_2A>
+			<Trial_3A>
+				<OnPaneInit>
+					(block
+						(
+							(militaryID (@ (objGetItems gPlayerShip "U +militaryID;") 0))
+							)
+						(objRemoveItem gPlayerShip militaryID)
+						(setq gResult (cmwChargePlayer gSource gPlayer gPlayerShip 25000))
+						(scrSetDesc gScreen
+							(switch
+								(eq gResult Nil)
+									(cat
+										"Unfortunately, you cannot afford to pay the fine. "
+										"The Commonwealth decides to sell your ship to cover your debt."
+										)
+								(eq gResult True)
+									(cat
+										"The Commonwealth takes 25000 credits from your account."
+										)
+								(cat
+									"In order to pay your fine, the Commonwealth repossesses your " (itmListToString gResult) "."
+									)
+								)
+							(if militaryID
+								" The Militia decides to revoke your military ID."
+								)
+							)
+						)
+				</OnPaneInit>
+				<Actions>
+					<Action name="Continue" key="C" default="1" cancel="1">
+						(if gResult
+							(scrExitScreen gScreen)
+							(block Nil
+								(plyDestroyed gPlayer (plyComposeString gPlayer (cat "lost %his% ship after a criminal conviction")))
+								(scrExitScreen gScreen 'forceUndock)
+								)
+							)
+					</Action>
+				</Actions>
+			</Trial_3A>
+			<Trial_4A>
+				<OnPaneInit>
+					(scrSetDesc gScreen
+						"After the trial, you are immediately taken to an transport ship that carries you to the rehabilitation colony. Living under the harsh rule of the colony&apos;s cruelly underpaid staff and dangerously squalid conditions, you eventually die from the common cold."
+						)
+				</OnPaneInit>
+				<Actions>
+					<Action name="Continue" key="C" default="1" cancel="1">
+						(block Nil
+							(plyDestroyed gPlayer (plyComposeString gPlayer (cat "was imprisoned for " gCrimesDesc)))
+							(scrExitScreen gScreen 'forceUndock)
+							)
+					</Action>
+				</Actions>
+			</Trial_4A>
+		</Panes>
+	</DockScreen>
+	
+	<DockScreen UNID="&dsCommonwealthConfiscate;"	nestedScreen="true">
+
+		<Panes>
+			<Default>
+				<OnPaneInit>
+					(block (desc itemToRemove itemsToConfiscate)
+					
+						; If we don't have a smuggler's cargo hold, then we confiscate
+						; all illegal items.
+						(if (not (objGetItems gPlayerShip "*I+SmugglersHold"))
+							(setq itemsToConfiscate 
+								(objGetItems gPlayerShip "*U +Illegal; -ID;")
+								)
+							)
+							
+						; If we don't have a military ID, then confiscate military items
+						(if (not (objGetItems gPlayerShip "*+MilitaryID"))
+							(setq itemsToConfiscate (append itemsToConfiscate
+								(objGetItems gPlayerShip "*U +Military; -ID;")
+								))
+							)
+					
+						; Remove items
+						(enum itemsToConfiscate itemToRemove
+							(block Nil
+								(objRemoveItem gPlayerShip itemToRemove)
+								
+								;Don't destroy the items.
+								(objAddItem gSource itemToRemove)
+								)
+							)
+
+						; Compose text
+						(setq desc "Commonwealth Customs has inspected your ship's cargo hold and confiscated ")
+						(if (eq (count itemsToConfiscate) 1)
+							(scrSetDesc gScreen (cat desc (itmGetName (item itemsToConfiscate 0) 8) "."))
+							(block (i)
+								(for i 0 (subtract (count itemsToConfiscate) 3)
+									(setq desc (cat desc (itmGetName (item ItemsToConfiscate i) 8) ", "))
+									)
+								(setq desc (cat desc (itmGetName (item ItemsToConfiscate (subtract (count itemsToConfiscate) 2)) 8) " and "))
+								(setq desc (cat desc (itmGetName (item ItemsToConfiscate (subtract (count itemsToConfiscate) 1)) 8) "."))
+								(scrSetDesc gScreen desc)
+								)
+							)
+						)
+				</OnPaneInit>
+
+				<Actions>
+					<Action name="Continue" default="1" cancel="1" key="C">
+						(block Nil
+							(comSealedContainerHack)
+							(scrExitScreen gScreen)
+							)
+					</Action>
+				</Actions>
+			</Default>
+		</Panes>
+	</DockScreen>
+	
+	<ItemType UNID="&itABCDEFNewsArticle;"
+			name=				"0x News Article"
+			level=				"1"
+			value=				"1"
+			mass=				"1"
+			frequency=			"notRandom"
+			attributes=			"Info"
+
+			description=		"0x News is a periodical that publishes articles on important events within the Commonwealth."
+			
+			charges=			"1"
+			
+			useScreen=			"Read"
+			>
+		<Image imageID="&rsItems1;" imageX="192" imageY="96" imageWidth="96" imageHeight="96"/>
+		<StaticData>
+			<Data id="Text">
+				(cat
+					"{/rtf "
+					"{/f:Header;/c:#ffffff; ABCDEF - The Associated Benefactors for the} \n"
+					"{/f:Header;/c:#ffffff; Collective Defense of Education and Freedom} \n"
+					"{/f:Header;/c:#ffffff; 0x News} \n"
+					"\n"
+					"{/f:LargeBold;/c:#ffffff; Council of Lords begin program to increase standing police forces.} \n"
+					"{/f:LargeBold;/c:#ffffff; Stronger police forces will address long-standing threats from hostile and criminal forces. } \n"
+					"{/f:Large;/c:#ffffff; Wiliom Sulfin } \n"
+					"\n"
+					"Last month, the Council of Lords approved an expansive program to increase the strength"
+					"of standing police forces in the New Beyond and the Ungoverned Territories. The program,"
+					"assigns police squadrons to defend existing Commonwealth stations in order to fight off"
+					"enemies such as the Centauri Warlords and the Charon Pirates, who have frequently committed"
+					"against civilians over the years. In particular, the Centauri Warlords have been occupying"
+					"colonies in the New Beyond for the last decade and it was only after the takeover of Raisu"
+					"Station by the warlord Arco Vaughn that the Council of Lords began drafting the program."
+					"\"It is about time that we put a stop to the warlords and pirates that have operated in"
+					"the New Beyond for far too long. While we were busy fighting the war with the Ares,"
+					"we almost forgot about the people living in systems like Eridani and that's when the"
+					"enemy had an opportunity to grow in power\", said the spokesperson for the Council."
+					"People of the New Beyond have long been calling for better protection from hostility and"
+					" now their voice has finally been heard."
+					"}"
+					)
+			</Data>
+			<Data id="news_banner">
+				(cat
+					"{/f:Title;/c:#ffffff; ABCDEF - The Associated Benefactors for the} \n"
+					"{/f:Title;/c:#ffffff; Collective Defense of Education and Freedom} \n"
+					"{/f:SubTitleBold;/c:#ffffff; 0x News}"
+					)
+			</Data>
+			<Data id="news_article_1">
+				{
+					headline:	(cat "Council of Lords begin program to increase standing police forces")
+					author:		(cat "Wiliam Sulfin")
+					date:		(cat "24-3-2418")
+					lead:		(cat "Stronger police forces will address long-standing threats from hostile and criminal forces")
+					text:		(cat
+									"Last month, the Council of Lords approved an expansive program to increase the strength\n"
+									"of standing police forces in the New Beyond and the Ungoverned Territories. The program,\n"
+									"assigns police squadrons to defend existing Commonwealth stations in order to fight off\n"
+									"enemies such as the Centauri Warlords and the Charon Pirates, who have frequently committed\n"
+									"against civilians over the years. In particular, the Centauri Warlords have been occupying\n"
+									"colonies in the New Beyond for the last decade and it was only after the takeover of Raisu\n"
+									"Station by the warlord Arco Vaughn that the Council of Lords began drafting the program.\n"
+									"\"It is about time that we put a stop to the warlords and pirates that have operated in\n"
+									"the New Beyond for far too long. While we were busy fighting the war with the Ares,\n"
+									"we almost forgot about the people living in systems like Eridani and that's when the\n"
+									"enemy had an opportunity to grow in power\", said the spokesperson for the Council.\n"
+									"People of the New Beyond have long been calling for better protection from hostility and\n"
+									" now their voice has finally been heard."
+									)
+					}
+			</Data>
+		</StaticData>
+		<DockScreens>
+			<Read
+					name=				"Ship's Interior"
+					backgroundID=		"none"
+					>
+				<Display>
+					<Text id="text" left="12" right="-12" top="16" bottom="-16" color="#ffffff"/>
+				</Display>
+				<Panes>
+					<Default>
+						<OnPaneInit>
+							(block (theText)
+								(setq theText (itmGetData gItem "Text"))
+								(if (not theText)
+									(setq theText (eval (itmGetStaticData gItem "Text")))
+									)
+
+								(if theText
+									(block Nil
+										(scrSetDisplayText gScreen "text" theText)
+										(scrSetDesc gScreen "The ROM contains a document.")
+										)
+									(block Nil
+										(scrSetDisplayText gScreen "text" "")
+										(scrSetDesc gScreen "The ROM is blank.")
+										)
+									)
+								)
+						</OnPaneInit>
+
+						<Actions>
+							<Action name="Done" key="D" default="1" cancel="1">
+								<Exit/>
+							</Action>
+						</Actions>
+					</Default>
+				</Panes>
+			</Read>
+		</DockScreens>
+		<Events>
+			<OnGlobalUniverseCreated>
+				(objAddItem gPlayerShip (itmCreate &itABCDEFNewsArticle; 1))
+			</OnGlobalUniverseCreated>
+		</Events>
+	</ItemType>
+	<Globals>
+		(block Nil
+			;Hack does not sound like a good word to include in a function name. Well, maybe it could indicate a sequel to NeuroNetHack.
+			(setq comSealedContainerHack (lambda ()
+				; If we went to trial for having a sealed container, then set a flag so
+				; that the container gets confiscated next time (instead of being imprisoned
+				; again).
+				;
+				; To fix this hack we need to have an OnGlobalPlayerDocked event in which
+				; we check for a smuggled sealed container (and set the appropriate crime)
+				; instead of the setting the crime inside of GetGlobalDockScreen (which
+				; should not have any side-effects).
+				
+				(if
+					(and (not (objGetItems gPlayerShip "*I+SmugglersHold;")) 
+							(objGetItems gPlayerShip "*U+SealedContainer;"))
+						(objSetData gPlayerShip "00001002_ConfiscateSealedContainer" True)
+						
+					(objSetData gPlayerShip "00001002_ConfiscateSealedContainer" Nil)
+					)
+					
+				; Same thing for slaves
+				
+				(if
+					(and (objGetData gPlayerShip "slaveSales")
+							(objGetItems gPlayerShip "* +Slaves;"))
+						(objSetData gPlayerShip "00001002_ConfiscateSlaves" True)
+						
+					(objSetData gPlayerShip "00001002_ConfiscateSlaves" Nil)
+					)
+				))
+				
+			(setq comTrafficControl (lambda (homeObj maxTraffic)
+				(if (ls (count (sysFindObject homeObj "s D:0010300C_traffic;")) maxTraffic)
+					(block (theShip)
+						(setq theShip (sysCreateShip
+							&tbCommTraffic;
+							(random (sysFindObject Nil "G -uncharted;"))
+							&svCommonwealth;
+							&evCommTrafficBehavior;
+							))
+						(objSetObjRefData theShip "home" homeObj)
+						(objFireEvent theShip "OrderBeginTraffic")
+						)
+					)
+				))
+			(setq cmwCrime (lambda (object severity description category victim known)
+				(objAppendDataEntry object "commonCrimes" {
+					description:description
+					severity:severity
+					category:category
+					known: (switch
+								known
+									True
+								(and victim (match (sysFindObject victim "TsA Z F J N:100; -auton; -zoanthrope;") theObject
+									(and (objCanDetectTarget theObject victim) (gr (random 0 359) (objGetDestiny theObject)))
+									))
+									True
+								Nil
+								)
+					})
+				))
+			;Returns the crime of greatest severity that the Commonwealth knows about
+			(setq cmwGetWorstKnownCrime (lambda (object)
+				(block
+					(
+						(result { description:0 severity:0 category:Nil victim:Nil })
+						(crimes (cmwGetKnownCrimes object))
+						)
+					(enum crimes theCrime
+						(if (gr (@ theCrime 'severity) (@ result 'severity))
+							(setq result theCrime)
+							)
+						)
+					result
+					)
+				))
+			;Returns the crime of greatest severity, regardless of whether it is known or unknown
+			(setq cmwGetWorstCrime (lambda (object)
+				(block
+					(
+						(result { description:0 severity:0 category:Nil victim:Nil })
+						(crimes (cmwGetCrimes object))
+						)
+					(enum crimes theCrime
+						(if (gr (@ theCrime 'severity) (@ result 'severity))
+							(setq result theCrime)
+							)
+						)
+					result
+					)
+				))
+			;Use this after the player's crimes have been recorded
+			(setq cmwClearCrimes (lambda (object)
+				(objSetData object "commonCrimes" Nil)
+				))
+			;Returns all crimes that the Commonwealth court knows about. Excludes crimes with no witnesses.
+			(setq cmwGetKnownCrimes (lambda (object)
+				(filter (objGetData object 'commonCrimes) theCrime (@ theCrime 'known))
+				))
+			;This returns all crimes that the player has yet to be punished for - either in court or through other means
+			(setq cmwGetCrimes (lambda (object)
+				(objGetData object 'commonCrimes)
+				))
+			;Returns a struct containing numbers of crimes by category
+			(setq cmwGetCrimeCategoryTable (lambda (crimes)
+				(block
+					(
+						(result
+							(struct
+								"negligence"		0
+								"hostility"			0
+								"murder"			0
+								"mass destruction"	0
+								)
+							)
+						)
+					(enum crimes theCrime
+						(inc@ result (@ theCrime 'category) 1)
+						)
+					result
+					)
+				))
+			;Returns a struct containing numbers of crimes by severity
+			(setq cmwGetCrimeSeverityTable (lambda (crimes)
+				(block
+					(
+						(result
+							(struct
+								"1"	0
+								"2"	0
+								"3"	0
+								"4"	0
+								)
+							)
+						)
+					(enum crimes theCrime
+						(inc@ result (cat (@ theCrime 'severity)) 1)
+						)
+					result
+					)
+				))
+			;Returns a short summary for the specified crimes.
+			(setq cmwGetCrimesDesc (lambda (crimes)
+				(block
+					(
+						(crimes_count (count crimes))																	;How many crimes are we describing?
+						(crimes_sorted (sortByLambda crimes (lambda (theCrime) (@ theCrime 'severity)) 'descending))	;Worst crime is always the first item
+						(crimes_descriptions (map crimes_sorted theCrime (@ theCrime 'description)))
+						;Number of crimes by category
+						(category_table
+							(cmwGetCrimeCategoryTable crimes)
+							)	
+						
+						;Number of crimes by severity
+						(severity_table
+							(cmwGetCrimeSeverityTable crimes)
+							)	
+						(worst (@ crimes_sorted 0))						;The struct for the most severe crime
+						(worst_severity (@ worst 'severity))						;The severity of the worst crime
+						(worst_description (@ worst 'description))					;The description of worst crime
+						(worst_category (@ worst 'category))						;The category of the worst crime
+						(worst_category_count (@ category_table worst_category))	;Total number of crimes in the same category as the worst crime
+						)
+					(switch
+						(eq crimes_count 1)
+							(@ crimes_descriptions 0)
+						
+						(eq crimes_count 2)
+							(cat
+								(@ crimes_descriptions 0)
+								" and "
+								(@ crimes_descriptions 1)
+								)
+						(eq crimes_count 3)
+							(cat
+								(@ crimes_descriptions 0)
+								", "
+								(@ crimes_descriptions 1)
+								", and "
+								(@ crimes_descriptions 2)
+								)
+						(gr crimes_count 3)
+							(cat
+								"multiple "
+								(switch
+									(ls worst_severity 2)
+										"offenses"
+									(ls worst_severity 3)
+										"violations"
+									(ls worst_severity 4)
+										"felonies"
+										
+									"atrocities"
+									)
+								", including "
+								(if (gr worst_category_count 1)
+									(cat worst_category_count " counts of " worst_category)
+									worst_description
+									)
+								)
+						)
+					)
+				))
+			;Use this when the player has gone to trial for some crimes
+			(setq cmwAddCrimesToRecord (lambda (object crimes)
+				(objAppendDataList object "commonCrimesRecord" crimes)
+				))
+			;This returns only crimes that have been tried in court
+			(setq cmwGetCrimesRecord (lambda (object)
+				(objGetData object "commonCrimesRecord")
+				))
+			;average_severity + crime_count - 2
+			(setq cmwGetPunishmentSeverity (lambda (crimes)
+				(int (+
+					(average (map crimes theCrime (@ theCrime 'severity)))
+					(max (- (count crimes) 2) 0)
+					))
+				))
+			;Returns the strike force level to use on a Commonwealth criminal
+			(setq cmwGetThreatLevel (lambda (object)
+				(block	(
+							(severity (cmwGetPunishmentSeverity (cmwGetKnownCrimes object)))
+							)
+					(switch
+						(ls severity 3)
+							0
+						(- severity 2)
+						)
+					)
+				))
+			;Charges the player and sells items for the player to cover any remaining costs
+			;If the player can pay without selling any items, returns True; if the player had to sell, returns the list of ItemStructs of items sold. If the player could not pay at all, returns Nil.
+			(setq cmwChargePlayer (lambda (station player player_ship cost)
+				(block
+					(
+						(credits_player (plyGetCredits player))
+						)
+					(if (geq credits_player cost)
+						(block Nil
+							(plyCharge player cost)
+							True
+							)
+						(block
+							(
+								repossessed
+								(credits_left (- cost credits_player))
+								items_sold
+								)
+							(plyCharge player credits_player)
+							(enumWhile
+								;Sort items by the price at which the station buys them.
+								(sortByLambda (objGetItems player_ship "*U") (lambda (theItem) (objGetSellPrice station theItem)) 'ascending)
+								(gr credits_left 0)
+								theItem
+								(block
+									(
+										(unitPrice (objGetBuyPrice station theItem))
+										)
+									(if unitPrice
+										(block (
+													(itemCount (itmGetCount theItem))
+													(unitsNeeded (ceil (/ credits_left unitPrice)))
+													(sellCount
+														(if (ls unitsNeeded itemCount)
+															unitsNeeded
+															itemCount
+															)
+														)
+													(sellPrice (* unitPrice sellCount))
+													)
+											(print (cat (itmGetName theItem 0) " [" sellCount "] sold to " (objGetName station) " for " sellPrice " credits."))
+											(objTransferItem player_ship station theItem unitsNeeded)
+											(setq credits_left (- credits_left sellPrice))
+											(lnkAppend items_sold (itmSetCount theItem unitsNeeded))
+											)
+										)
+									)
+								)
+							(prnVariables "Charge Player" (list (list "Credits Left" credits_left) (list "Items Sold" (itmListToString items_sold))))
+							(if (leq credits_left 0)
+								(block Nil
+									(plyCredit player (- credits_left))
+									items_sold
+									)
+								Nil
+								)
+							)
+						)
+					)
+				))
+			;Gets recommended number of reinforcements to use based on system level and crime level
+			(setq cwpGetReinforcementCount (lambda Nil
+				(max 2 (min 8 (add (sysGetLevel) (cwpGetAlertLevel))))
+				))
+			;Level varies based on amount of untried criminal activity in the system.
+			(setq cwpGetAlertLevel (lambda Nil
+				(block	(
+							(threats (map (sysFindObject Nil "TsA") 'excludeNil theObject
+								(block ((threatLevel (cmwGetThreatLevel theObject)))
+									(if (gr threatLevel 0)
+										threatLevel
+										Nil
+										)
+									)
+								))
+							)
+					(max 0 (+ (- (average threats) 2) (count threats)))
+					)
+				))
+			;Orders a captain to pursue a target
+			(setq cwpOrderPursueTarget (lambda (captain target)
+				(block Nil
+					(objSetData captain "&evCommPoliceCaptain;_behavior" 'actPursueTarget)
+					(objSetData captain "&evCommPoliceCaptain;_target" target)
+					(if (and (eq target gPlayerShip) (not (objIsEnemy gPlayerShip))) ;The player cannot dock with Commonwealth stations if they are hostile
+						(objFireRecurringEvent 150 captain "OnPursuePlayer")
+						(objFireRecurringEvent 150 captain "OnPursueNPC")
+						)
+					)
+				))
+			(setq cwpTargetIsUnderPursuit (lambda (target)
+				(match (sysFindObject Nil "sA") theShip (eq (cwpGetCaptainTarget theShip) target))
+				))
+			;Fired by OnCreate events
+			(setq cmwOnCreate (lambda Nil
+				(block Nil
+					;Check if no nearby stations have a captain
+					(if (cmwNeedsPoliceCaptain gSource)
+						(cmwCreatePoliceCaptain)
+						)
+					(objFireRecurringEvent 90 gSource "OnPlayerCeaseFireCheck")
+					(objFireRecurringEvent 90 gSource "OnBehavior")
+					)
+				))
+			(setq cmwNeedsPoliceCaptain (lambda (station)
+				(and
+					;Check if we lack a captain and if there are no other captains nearby
+					(not (objGetObjRefData station "commonPoliceCaptain"))
+					<!--
+					(or
+						
+						(match (sysFindObject station "TsA E") theEnemy (gr (objGetCombatPower theEnemy) (objGetCombatPower nearbyCaptain)))
+						)
+					-->
+					(or
+						(objHasAttribute station 'majorStation)
+						(and
+							(gr (cwpGetAlertLevel) 2)
+							(not (setq nearbyCaptain (@
+								(map
+									(sysFindObject station "TA N:100; J:&svCommonwealth;")
+									'excludeNil
+									theStation
+									(objGetObjRefData theStation "commonPoliceCaptain")
+									)
+								0
+								)))
+							)
+						)
+					)
+				))
+			;Creates a captain from a nearby stargate
+			(setq cmwCreatePoliceCaptain (lambda Nil
+				(block
+					(
+						(spawn (objGetNearestStargate gSource))
+						(policeCaptainLevel (mathScale
+							(+ (sysGetLevel) (cwpGetAlertLevel))
+							0
+							20
+							0
+							5
+							))
+						(policeCaptainClass (@
+							(typGetStaticData &svCommonwealth; 'PoliceCaptainTable)
+							policeCaptainLevel
+							))
+						(policeCaptain (sysCreateShip
+							policeCaptainClass
+							(sysVectorPolarOffset spawn 0 1)
+							&svCommonwealth;
+							&evCommPoliceCaptain;
+							))
+						)
+					(for i 1 (cwpGetReinforcementCount)
+						(cwpOnDeployOfficer policeCaptain spawn)
+						)
+					(objSetObjRefData gSource "commonPoliceCaptain" policeCaptain)
+					(objSetObjRefData policeCaptain "&evCommPoliceCaptain;_home" gSource)
+					(objSetData policeCaptain "&evCommPoliceCaptain;_behavior" 'normal)
+					(shpSetAISetting policeCaptain 'aggressor Nil)
+					(shpSetAISetting policeCaptain 'noTargetsOfOpportunity True)
+					
+					(objSetName policeCaptain (cat "Captain " (cwpName)) 0x0080)
+					
+					(objEnumItems policeCaptain "pI" theItem
+						(shpEnhanceItem policeCaptain theItem 0x010F)
+						)
+					
+					(shpCancelOrders policeCaptain)
+					(shpOrder policeCaptain 'orbit gSource 20)
+					
+					(objFireRecurringEvent 90 policeCaptain "OnBehavior")
+					
+					;(objSetShowAsDestination policeCaptain)
+					)
+				))
+			;Fired by OnAttackedByPlayer events
+			(setq cmwOnAttackedByPlayer (lambda Nil
+				<!--	(if (not (objGetProperty gSource 'ignoreFriendlyFire))	-->
+				(block
+					(
+						(damageSignature (cat "commonAttackDamageBy" (objGetID aOrderGiver)))
+						(damageRatio (objGetRecentDispositionDamageRatio aOrderGiver))
+						damageTotal
+						(maxTotalHP (+ (objGetProperty gSource 'maxHP) (objGetProperty gSource 'maxStructuralHP)))
+						(captain (objGetObjRefData gSource "commonPoliceCaptain"))
+						)
+					(objIncTempData gSource damageSignature aDamageHP 60 0)
+					(setq damageTotal (objGetTempData gSource damageSignature))
+					(prnEventStart "&baCommonwealthStation;_OnAttackedByPlayer")
+					(switch
+						;If the attacker is a criminal, engage
+						(gr (cmwGetThreatLevel aOrderGiver) 0)
+							(if (not (eq (shpGetOrderTarget captain) aOrderGiver))
+								(block Nil
+									(objSendMessage aOrderGiver gSource "Engage the criminal!")
+									(shpOrderImmediate captain 'attack aOrderGiver)
+									)
+								)
+					
+						;If we are angry at the player and the player has already dealt 33% of our health in damage to us, say something and charge the player for every second we are being attacked.
+						(and (objIsAngryAt gSource aOrderGiver) (gr damageTotal (/ maxTotalHP 3)) (gr (- (unvGetTick) (objGetData gSource 'lastMessageTick_CeaseFire)) 30))
+							;If the player has dealt more damage to friends than enemies, the player is probably intentionally hostile.
+							(if (gr damageRatio 1)
+								(block Nil
+									(objSendMessage aOrderGiver gSource "CEASE FIRE IMMEDIATELY!")
+									(objSetData gSource 'lastMessageTick_CeaseFire (unvGetTick))
+									(cmwCrime aOrderGiver 2 (cat "open hostility towards " (objGetName gSource 4)) 'hostility gSource)
+									)
+								(block Nil
+									(objSendMessage aOrderGiver gSource "DISABLE YOUR WEAPONS NOW!")
+									(objSetData gSource 'lastMessageTick_CeaseFire (unvGetTick))
+									(cmwCrime aOrderGiver 1 (cat "friendly fire negligence towards " (objGetName gSource 4)) 'negligence gSource)
+									)
+								)
+								
+						;Don't tolerate the player taking away more than 20% of our health. Add a crime every second while the player attacks us.
+						(gr damageTotal (/ maxTotalHP 5))
+							(block Nil
+								(objSendMessage aOrderGiver gSource "WATCH YOUR TARGETS NOW!")
+								(objSetData gSource 'lastMessageTick (unvGetTick))
+								(objSetProperty gSource 'playerBlacklisted True)
+								)
+						)
+						
+					(prnVariables "&baCommonwealthStation;_OnAttackedByPlayer" (list (list "Max Total HP" maxTotalHP) (list "Damage" aDamageHP) (list "Total Damage" damageTotal) (list "Damage Ratio: " (objGetRecentDispositionDamageRatio aOrderGiver)) ))
+					(prnEventEnd "&baCommonwealthStation;_OnAttackedByPlayer")
+					)
+				))
+			;Controls a station's anger based on the player's criminal activity and activated weapons.
+			(setq cmwOnPlayerCeaseFireCheck (lambda Nil
+				(if (and (ls (objGetDistance gSource gPlayerShip) 100) (or (objIsAngryAt gSource gPlayerShip) (cmwGetKnownCrimes gPlayerShip)) (not (objIsEnemy gSource gPlayerShip)))
+					(block Nil
+						(prnEventStart "&baCommonwealthStation;_OnPlayerCeaseFireCheck")
+						(if (match
+								(objGetItems gPlayerShip "wI")
+								theItem
+								(and (objGetItemProperty gPlayerShip theItem 'enabled) (itmGetProperty theItem 'canBeDisabled))
+								)
+							(block Nil
+								(objSetProperty gSource 'playerBlacklisted True)
+								(if (gr (- (unvGetTick) (objGetData gSource 'lastMessageTick_DisableWeapons)) 150)
+									(block Nil
+										(objSetData gSource 'lastMessageTick_DisableWeapons (unvGetTick))
+										(objSendMessage gPlayerShip gSource "Disable your weapons or we will engage!")
+										)
+									)
+								)
+							(block ((captain (objGetObjRefData gSource "commonPoliceCaptain")))
+								(objSetProperty gSource 'playerBlacklisted Nil)
+								
+								;UNNECESSARY CODE. REMOVE THIS
+								(if (eq (shpGetOrderDesc captain) (list 'attack gPlayerShip))
+									(block Nil
+										(shpCancelOrders captain)
+										(shpOrder captain 'orbit gSource 20)
+										)
+									)
+								)
+							)
+						(prnEventEnd "&baCommonwealthStation;_OnPlayerCeaseFireCheck")
+						)
+					)
+				))
+			;Fired by OnDestroy events
+			(setq cmwOnDestroy (lambda Nil
+				(block
+					(
+						(policeCaptain (objGetObjRefData gSource "commonPoliceCaptain"))
+						(nearbyCaptains
+							(filter (sysFindObject gSource "sA P D:&evCommPoliceCaptain;_behavior") theCaptain (eq (objGetData theCaptain "&evCommPoliceCaptain;_behavior") 'normal))
+							)
+						(name (objGetName gSource 0x0040))
+						(name_attacker (objGetName aOrderGiver 0x0040))
+						)
+					(prnEventStart "&baCommonwealthStation;_OnDestroy")
+					(sysCancelTimerEvent gSource "OnPlayerCeaseFireCheck")
+					(sysCancelTimerEvent gSource "OnBehavior")
+					(objSetEventHandler gSource Nil)
+					(if (and (not policeCaptain) (gr (count nearbyCaptains) 0))
+						(setq policeCaptain (pick nearbyCaptains))
+						)
+					(cwpOnStationDestroyed aWreckObj policeCaptain aOrderGiver)
+					<!--	(cwpIncAlertLevel 2)	-->
+					<!--
+					(enum nearbyCaptains theCaptain
+						(if (gr (objGetDestiny theCaptain) 180)
+							(block Nil
+								(shpOrderImmediate theCaptain 'attack aOrderGiver)
+								(objSendMessage aOrderGiver theCaptain (cat (objGetName theCaptain) " to " name ": Attacking " name_attacker))
+								)
+							)
+						)
+					-->
+						
+					; Destroy items on the station
+					(intDestroyItems gSource)
+						
+					; Add to the destroyer's record
+					(cmwCrime aOrderGiver 4 (cat "the destruction of " (objGetName gSource 4)) "mass destruction" gSource)
+					(prnEventEnd "&baCommonwealthStation;_OnDestroy")
+					)
+				))
+			;Makes a captain react to a station's destruction
+			(setq cwpOnStationDestroyed (lambda (station captain destroyer)
+				(block Nil
+					(prnEventStart "&evCommPoliceCaptain;_OnStationDestroyed")
+					
+					(objSendMessage gPlayerShip captain (cat "Alert! " (objGetName station) " is down! Evacuate the area immediately!"))
+					
+					(objSetObjRefData captain "&evCommPoliceCaptain;_station" station)
+					(objSetObjRefData captain "&evCommPoliceCaptain;_target" destroyer)
+					(if (cwpTargetStrikeCheck destroyer)
+						(cwpOrderStrikeForce gSource destroyer)
+						(objFireEvent captain "OnSquadronCheck")
+						)
+					
+					(prnEventEnd "&evCommPoliceCaptain;_OnStationDestroyed")
+					)
+				))
+			(setq cwpOrderOfficersAttack (lambda (captain target)
+				(enum (cwpGetOfficers captain) theEscort
+					(shpOrderImmediate theEscort 'attack target)
+					)
+				))
+			;Check if we are able to send a strike force at a target
+			(setq cwpTargetStrikeCheck (lambda (ship)
+				(and
+					(gr (cmwGetPunishmentSeverity (cmwGetKnownCrimes ship)) 2)
+					(not (match (sysFindObject ship "sA X") theShip (objGetData theShip 'commStrikeForce)))
+					(gr (- (unvGetTick) (sysGetData 'commLastStrikeTick)) 300)
+					;(ls (count (filter (sysFindObject Nil "sA J:&svCommonwealth;") theShip (eq (objGetEventHandler theShip) &evCommStrikeCaptain;))) 5)
+					(ls (sysGetData 'commActiveStrikeForces) 5)
+					)
+				))
+			;Fired by OnDestroy events. Handles strike force retaliation
+			(setq cwpStrikeForceCheck (lambda Nil
+				(if (cwpTargetStrikeCheck aOrderGiver)
+					(block	(
+								(captain (match (sysFindObject gSource "sA J:&svCommonwealth;") theShip (eq (objGetData theShip "&evCommPoliceCaptain;_behavior") 'normal)))
+								)
+						(if captain
+							(cwpOrderStrikeForce captain aOrderGiver)
+							)
+						)
+					)
+				))
+			;Makes a captain call a strike force
+			(setq cwpOrderStrikeForce (lambda (captain target)
+				(block Nil
+					(cwpSetCaptainTarget captain target)
+					(shpCancelOrders captain)
+					(shpOrder captain 'goToPos (sysVectorPolarOffset (objGetNearestStargate captain (random 0 359) 20)))
+					(shpOrder captain 'wait (random 3 5))
+					(shpOrder captain 'fireEvent captain 'OnDeployStrikeForce)
+					(shpOrder captain 'fireEvent captain 'OnSquadronReady)
+					(cwpSetCaptainBehavior captain 'actCallSquadron)
+					)
+				))
+			;Creates a strike force against a target
+			(setq cwpCreateStrikeForce (lambda (target severity)
+				(block Nil
+					(sysAddEncounterEvent
+						(@ (list 300 360 450 600 800 1000 1250) severity)
+						target
+						(@ (typGetStaticData &svCommonwealth; 'StrikeForceTable) severity)
+						(objGetNearestStargate target)
+						)
+					(sysIncData 'commActiveStrikeForces 1)
+					(sysSetData 'commLastStrikeTick (unvGetTick))
+					)
+				))
+			(setq cwpSetCaptainTarget (lambda (captain target)
+				(objSetObjRefData captain "&evCommPoliceCaptain;_target" target)
+				))
+			(setq cwpGetCaptainTarget (lambda (captain)
+				(objGetObjRefData captain "&evCommPoliceCaptain;_target")
+				))
+			(setq cwpSetCaptainBehavior (lambda (captain behavior)
+				(objSetData captain "&evCommPoliceCaptain;_behavior" behavior)
+				))
+			(setq cwpGetCaptainBehavior (lambda (captain)
+				(objGetData captain "&evCommPoliceCaptain;_behavior")
+				))
+			(setq cwpSetCaptainHome (lambda (captain home)
+				(objSetData captain "&evCommPoliceCaptain;_home" home)
+				))
+			(setq cwpGetCaptainHome (lambda (captain)
+				(objGetData captain "&evCommPoliceCaptain;_home")
+				))
+			(setq cwpGetOfficerCaptain (lambda (officer)
+				(objGetObjRefData officer "&evCommPoliceOfficer;_captain")
+				))
+			(setq cwpSetOfficerCaptain (lambda (officer captain)
+				(objSetObjRefData officer "&evCommPoliceOfficer;_captain" captain)
+				))
+			(setq cwpGetOfficers (lambda (captain)
+				(sysFindObjectRefData captain "sA" "&evCommPoliceOfficer;_captain" captain)
+				))
+			;Gets one officer that is escorting a captain
+			(setq cwpGetIdleOfficer (lambda (captain)
+				(match (cwpGetOfficers captain) theOfficer (eq (shpGetOrder theOfficer) 'escort))
+				))
+			;Gets all officers that are escorting a captain
+			(setq cwpGetAllIdleOfficers (lambda (captain)
+				(filter (cwpGetOfficers captain) theOfficer (eq (shpGetOrder theOfficer) 'escort))
+				))
+			;Gets the number of additional escorts that a captain should have
+			(setq cwpGetOfficersNeeded (lambda (captain target)
+				(block	(
+							(strength_target (objGetCombatPower target))
+							(strength_officers 0)
+							officers
+							)
+					(enumWhile (cwpGetAllIdleOfficers captain) (ls strength_officers strength_target) theOfficer
+						(block Nil
+							(lnkAppend officers theOfficer)
+							(setq strength_officers (+ strength_officers (objGetCombatPower theOfficer)))
+							)
+						)
+					officers
+					)
+				))
+			;Fired by OnAttacked events
+			(setq cwpOnAttacked (lambda (object attacker damage weapon)
+				(block
+					(
+						(behavior (objGetData object "&evCommPoliceCaptain;_behavior"))
+						(target (objGetObjRefData object "&evCommPoliceCaptain;_target"))
+						(damage_adjusted (intDamageContext object attacker damage))
+						)
+					(prnEventStart "&evCommPoliceCaptain;_OnOfficerAttacked")
+						
+					(switch
+						(not target)
+							(if (gr (cwpIncObjectAttackDamage attacker damage_adjusted) 30)
+								(block Nil								
+									(cmwCrime attacker 1 "harassing a police captain" 'hostility gSource)
+									(objSendMessage attacker object "Do not harass the Commonwealth Police!")
+									)
+								)
+						(neq attacker target)
+							(if (gr (cwpIncObjectAttackDamage attacker damage_adjusted) 30)
+								(block Nil
+									(cmwCrime attacker 1 "disrupting a police operation" 'hostility gSource)
+									(objSendMessage attacker object "Do not interfere with the law!")
+									)
+								)
+						(eq attacker target)
+							(switch
+								(eq behavior 'actCallSquadron)
+									Nil
+								
+								(eq behavior 'msgDoNotResist)
+									(block Nil
+										(objSetData object "&evCommPoliceCaptain;_lastAttackedTick_target" (unvGetTick))
+										(if (gr (cwpIncObjectAttackDamage target damage_adjusted) 30)
+											(block Nil
+												(cwpOrderOfficersAttack object target)
+												(objSendMessage target object "Initiate Code Red!")
+												(cmwCrime target 2 "resisting arrest" 'murder gSource)
+												)
+											(objSendMessage target object "Do not try to resist the law!")
+											)
+										)
+										
+								(block Nil
+									(objSetData object "&evCommPoliceCaptain;_behavior_previous" behavior)
+									(objSetData object "&evCommPoliceCaptain;_behavior" 'msgDoNotResist)
+									(objSendMessage target object "Cease fire!")
+									)
+								)
+						)
+					(prnEventEnd "&evCommPoliceCaptain;_OnOfficerAttacked")
+					)
+				))
+			(setq cwpIncObjectAttackDamage (lambda (object damage)
+				(objIncTempData object (cat "&evCommPoliceCaptain;_lastAttackedDamage_" (objGetID object)) damage 'untilZero 1)
+				))
+			;Creates an officer ship for a captain
+			(setq cwpOnDeployOfficer (lambda (captain spawn)
+				(block
+					(
+						(ship (sysCreateShip (objGetType captain) spawn &svCommonwealth; &evCommPoliceOfficer;))
+						)
+					(prnEventStart "&evCommPoliceCaptain;_OnDeployOfficer")
+					(shpCancelOrders ship)
+					(shpOrder ship 'escort captain)
+					(shpSetAISetting ship 'fireRateAdj 10)
+					(shpSetAISetting ship 'fireRangeAdj 100)
+					(shpSetAISetting ship 'aggressor Nil)
+					(shpSetAISetting ship 'noTargetsOfOpportunity True)
+					(shpSetAISetting ship 'noAttackOnThreat True)
+					(objSetObjRefData ship "&evCommPoliceOfficer;_captain" captain)
+					(objSetName ship (cat "Officer " (cwpName)) 0x0080)
+					;(objSetShowAsDestination ship)
+					(prnEventEnd "&evCommPoliceCaptain;_OnDeployOfficer")
+					)
+				))
+			;Makes a captain react to an officer's destruction
+			(setq cwpOnOfficerDestroyed (lambda (object destroyer)
+				(block
+					(
+						(escorts (sysFindObject object "sA O:escort"))
+						(target (objGetObjRefData object "&evCommPoliceCaptain;_target"))
+						(behavior (objGetData object "&evCommPoliceCaptain;_behavior"))
+						)
+					(prnEventStart "&evCommPoliceCaptain;_OnOfficerDestroyed")
+					
+					(switch
+						(not (objCanAttack destroyer))
+							Nil
+						<!--
+						(eq behavior 'actCallSquadron)
+							Nil
+						-->
+						(eq destroyer target)
+							(if (eq behavior 'msgDoNotResist)
+								(block Nil
+									(cmwCrime destroyer 3 "resisting arrest" 'murder gSource)
+									)
+								(block Nil
+									(objSetData object "&evCommPoliceCaptain;_behavior_previous" behavior)
+									(objSetData object "&evCommPoliceCaptain;_behavior" 'msgDoNotResist)
+									(cmwCrime destroyer 2 "resisting arrest" 'murder gSource)
+									)
+								)
+						<!--
+						(if (gr (objGetRecentDispositionDamageRatio destroyer) 1)
+							)
+						-->
+						(block Nil
+							(cmwCrime destroyer 2 "the killing of a Commonwealth police officer" 'murder gSource)
+							(if (gr (cmwGetThreatLevel destroyer) 2)
+								(block Nil
+									(cwpOrderOfficersAttack object destroyer)
+									(objSendMessage destroyer object "Initiate Code Red!")
+									)
+								)
+							)
+						)
+					
+					(objSetData object "&evCommPoliceCaptain;_lastDestroyedTick_target" (unvGetTick))
+					
+					(prnEventEnd "&evCommPoliceCaptain;_OnOfficerDestroyed")
+					)
+				))
+			;TO DO
+			(setq cwpOnCaptainDestroyed (lambda Nil
+				Nil
+				))
+			(setq cwpName (lambda Nil
+				(if cwpNamesList
+					(block
+						(
+							(index
+								(random
+									0
+									(subtract
+										(count
+											cwpNamesList
+											)
+										1
+										)
+									)
+								)
+							(name (@ cwpNamesList index))
+							)
+						(lnkRemove cwpNamesList index)
+						name
+						)
+					(random
+						(list
+							"Moromisato"
+							"Tangent"
+							"Merchant"
+							"Bollay"
+							"Anderson"
+							"Brown"
+							"Curran"
+							"Dondi"
+							"Friis"
+							"Huitric"
+							"Lenker"
+							"Liersch"
+							"Merkley"
+							"Miao"
+							"Mitchell"
+							"Mosher"
+							"Murray"
+							"Needlerman"
+							"Newman"
+							"Patrick"
+
+							"Shrike"
+							"Betelgeuse"
+							"Atarlost"
+							"Burzmali"
+							"Digdug"
+							"Alterecco"
+							"Wolfy"
+							"dvlenk6"
+							"Bimbel"
+							"Fossaman"
+							"Yugi"
+							"Prophet"
+							"Periculi"
+							"Ttech"
+							"SparcMan"
+							"RPC"
+							)
+						)
+					)
+				))
+				
+			(setq
+				cwpNamesList
+				(list
+					"Aeon Blaze"
+					"Aeonic"
+					"ahrenjb"
+					"Amariithynar"
+					"Anakey"
+					"Androgeos"
+					"Barják András"
+					"Aniki"
+					"Apemant"
+					"Aquilai"
+					"Arkheias"
+					"AssumedPseudonym" "Nym"
+					"Azmond"
+
+					"Lee Baugh"
+					"BDR"
+					"BlackPheonix"
+					"Blitzgerg"
+					"BloodEagle"
+					"Bluesaberist"
+					"Bobby"
+					"Boring"
+					"Boris the Cat"
+					"David Bradley"
+					"bromin"
+
+					"Cardinal"
+					"CFG"
+					"Charon Mass of Goo"
+					"Chris rh"
+					"Kevin Chen"
+					"CrazedGamer"
+					"Crom"
+					"Curudan"
+					"Cygnus.X1"
+					"Czert"
+
+					"Dakota"
+					"Dalva"
+					"Darksider"
+					"Darth Saber"
+					"DarthGeek"
+					"Datal"
+					"Charles Davis"
+					"Demanther"
+					"dkedr"
+					"Drako Slyith"
+					"Drayk"
+					"Dorne"
+					"Dosgamer3"
+					"Bill Dunigan"
+
+					"Markus Eckert"
+					"EditorRUS"
+					"El FluffyDragon"
+					"erwgd"
+					"Evilbob"
+
+					"F50"
+					"FAD"
+					"Fatboy"
+					"Ferdinand"
+					"Shane J. Filomena"
+					"Forevian"
+					"FourFire"
+					"Colin Freas"
+					"Danny Fremen"
+
+					"Sisir Gadisetti" "Blitz"
+					"Marcus Gavel"
+					"giantcabbage"
+					"Goat Not Sheep"
+					"Fritz Goldhoorn"
+
+					"Hades"
+					"HarvesterOfBeer"
+					"Heavy Stylus"
+					"Hex"
+					"H Iris"
+					"The Holy Thom"
+					"Ho'okoa"
+
+					"Icabod458"
+					"Ihlosi"
+
+					"Eric James"
+					"jimj316"
+					"JohnBWatson"
+
+					"Wayne Ka'auamo"
+					"Kamikaze"
+					"Hatsuya Kanzaki"
+					"Karl"
+					"kay.py"
+					"Keleus"
+					"Kenquinn The Insane One"
+					"Kiro"
+					"Kobell"
+					"Kurukku"
+
+					"l0mars01"
+					"Brian Lane"
+					"TheLastBrunnenG"
+					"Lessil"
+					"Chuck Lindgren"
+					"lootnplunder"
+					"LordSutekh"
+					"Lypos"
+
+					"Mage2069"
+					"Magnus"
+					"Stefan Maier"
+					"Manekineko"
+					"Marmot"
+					"D. F. McCourt"
+					"Megas"
+					"Mesh"
+					"Mingan"
+					"Mist"
+					"Mutos"
+
+					"(name here)"
+					"Namer4"
+					"Narok"
+					"Narthan"
+					"Nate879"
+					"Jeremy Nicoll"
+					"Jan Nielsen"
+					"Nimatek"
+					"NMS"
+
+					"Obsidean"
+					"OddBob"
+					"Omniaddict"
+
+					"P122"
+					"Palmiche"
+					"Kris Parker"
+					"Petrus"
+					"pixelfck"
+					"PKodon"
+					"PlayMeNow"
+					"PM"
+					"Ponkan"
+					"Premier"
+					"Psycholis"
+					"ptbptb"
+
+					"Quaziz"
+					"Quirk"
+
+					"raelz"
+					"Ralf"
+					"Rhonda Reese"
+					"Relanat"
+					"Retroactive"
+					"Revolver"
+					"robotarozum"
+					"David Rotberg"
+
+					"Salvagebot 1.0"
+					"Jason Schapiro"
+					"Schilcote"
+					"Schnobs"
+					"Daryl Schoneberg"
+					"Sdw195"
+					"Section6"
+					"Sero"
+					"SevereTireDamage"
+					"Shaman"
+					"Sheltem"
+					"SiaFu"
+					"Sideyr"
+					"Siegfried"
+					"Silentdances"
+					"6cef"
+					"SJ"
+					"Peter F. Slattery"
+					"SolarGalaxy"
+					"Speaker for Treecats"
+					"SpeedOfSquid"
+					"Sponge" "SpongeJr"
+					"Star Weaver"
+					"StarshipEngineer"
+					"stealthx"
+					"Stormhawk"
+					"Sutaa"
+
+					"Tamagoyaki"
+					"Tarbos"
+					"TaviRider"
+					"Rick Tengdin"
+					"Teslin K. R."
+					"trouver"
+					"TVR"
+
+					"Ultimate Chicken"
+
+					"Vachtra"
+					"Vastin"
+					"Viperion"
+
+					"The Wanderer"
+					"Watch TV Do Nothing"
+					"Weelillad"
+					"Wolfwalker"
+					"Wurmish"
+
+					"Xephyr"
+
+					"Zerat00l"
+					)
+				)
+			
+			
+			
+			
+			
+			
+			
+			
+			;OVERRIDEN BY SOVEREIGN BASE
+			(setq korOnShipDestroyed (lambda ()
+				Nil
+				))
+			)
+	</Globals>
+</TranscendenceExtension>
