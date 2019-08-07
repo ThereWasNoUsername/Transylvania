@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!DOCTYPE TranscendenceExtension
+[
+	
+	<!ENTITY unidNeurogueLibrary			"0xED6E0400">
+	
+	<!--	CUSTOM	ENTITIES	-->
+	<!ENTITY unidExtension					"0xED6E0405">
+]>
+<TranscendenceExtension UNID="&unidExtension;" name="Neurogue Demo 0" apiVersion="35" version="1.0" credits="0xABCDEF (Game &amp; Forum) / Archcannon (IRC &amp; Xelerus)">
+	<Library UNID="&unidNeurogueLibrary;"/>
+</TranscendenceExtension>

@@ -1,0 +1,226 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!DOCTYPE TranscendenceExtension
+[
+	
+	<!ENTITY unidEdgeGlobals				"0xED6E6000">
+	
+	<!--	CUSTOM	ENTITIES	-->
+	<!ENTITY unidLifehackLibrary					"0xED6E0410">
+	<!ENTITY dsLifehack						"0xED6E0411">
+]>
+<!--
+Now look at this NetHack that I just found. When I say fight, be ready to die. Fight!
+-->
+<TranscendenceLibrary UNID="&unidLifehackLibrary;" name="Lifehack Library" apiVersion="35" version="1.0" credits="0xABCDEF (Game &amp; Forum) / Archcannon (IRC &amp; Xelerus)">
+
+	<Library UNID="&unidEdgeGlobals;"/>
+	
+	<DockScreen UNID="&dsLifehack;"
+			name=				"Lifehack"
+			backgroundID=		"none"
+			>
+		<OnScreenInit>
+		</OnScreenInit>
+			
+		<Display>
+			<Canvas>
+				(lifDraw)
+			</Canvas>
+		</Display>
+		<Panes>
+			<Default>
+				<OnPaneInit>
+				</OnPaneInit>
+				<Actions>
+					<Action id="actionUpdate">
+						(lifUpdate)
+					</Action>
+				</Actions>
+			</Default>
+		</Panes>
+		
+		<Language>
+			<Text id="actionUpdate">"[U]pdate"</Text>
+		</Language>
+	</DockScreen>
+	<Globals>
+		(block Nil
+			(setq lifGrid Nil)
+			(setq lifSetGrid (lambda (grid)
+				(block Nil
+					(for y 0 (- (count grid) 1)
+						(block	(
+									(row (@ grid y))
+									)
+							(for x 0 (- (count row) 1)
+								(set@ row x (eq (@ row x) '0))
+								)
+							)
+						)
+					(setq lifGrid grid)
+					)
+				))
+			(setq lifUpdate (lambda Nil
+				(block	(
+							;All changes occur simultaneously, so ignore all changes made during the update until it is complete.
+							(newGrid (append lifGrid))
+							)
+					(for y 0 (- (lifGetGridHeight) 1)
+						(block	(
+									;Create a separate pointer for each row in the grid
+									(row (append (@ lifGrid y)))
+									)
+							(for x 0 (- (lifGetGridWidth y) 1)
+								(block	(
+											(pos {x:x y:y})
+											(liveNeighborCount (lifGetLiveNeighborCount pos))
+											)
+									(print (if (lifGetCellState pos) "Live" "Dead"))
+									(print (cat "Live Neighbors: " liveNeighborCount))
+									(if (lifGetCellState pos)
+										(if (or (ls liveNeighborCount 2) (gr liveNeighborCount 3))
+											(set@ row x Nil)
+											(set@ row x True)
+											)
+										(if (eq liveNeighborCount 3)
+											(set@ row x True)
+											)
+										)
+									)
+								)
+							(set@ newGrid y row)
+							)
+						)
+					(setq lifGrid newGrid)
+					)
+				))
+			(setq lifDraw (lambda Nil
+				(block	(
+							(size 10)
+							)
+					(cnvDrawRect 0 0 600 500 '(0 0 0))
+					(for y 0 (- (lifGetGridHeight) 1)
+						(for x 0 (- (lifGetGridWidth y) 1)
+							(cnvDrawRect
+								(* x size)
+								(* y size)
+								size
+								size
+								(if (lifGetCellState {x:x y:y})
+									'(255 255 255)
+									'(0 0 0)
+									)
+								)
+							)
+						)
+					)
+				))
+			(setq lifGetLiveNeighborCount (lambda (pos)
+				(block	(
+							(x (@ pos 'x))
+							(y (@ pos 'y))
+							(result 0)
+							)
+					(enum
+						(list
+							{x:(+ x 1) y:y}			;Right
+							{x:(+ x 1) y:(+ y 1)}	;Down-Right
+							{x:(+ x 1) y:(- y 1)}	;Up-Right
+							{x:(- x 1) y:y}			;Left
+							{x:(- x 1) y:(+ y 1)}	;Down-Left
+							{x:(- x 1) y:(- y 1)}	;Up-Left
+							{x:x y:(+ y 1)}			;Down
+							{x:x y:(- y 1)}			;Up
+							)
+						thePos
+						(if (lifGetCellState thePos)
+							(setq result (+ result 1))
+							)
+						)
+					result
+					)
+				))
+			(setq lifGetCellState (lambda (pos)
+				(block	(
+							(x (@ pos 'x))
+							(y (@ pos 'y))
+							)
+					(and (gr y 0) (ls y (lifGetGridHeight)) (gr x 0) (ls x (lifGetGridWidth y)) (@ (@ lifGrid y) x))
+					)
+				))
+			(setq lifGetGridHeight (lambda Nil
+				(count lifGrid)
+				))
+			(setq lifGetGridWidth (lambda (y)
+				(count (@ lifGrid y))
+				))
+			(setq lifShowScreen (lambda Nil
+				(scrShowScreen gScreen &dsLifehack;)
+				))
+			(setq lifSetDefaults (lambda Nil
+				(lifSetGrid '(
+					(. . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .)
+					(. . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .)
+					(. . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .)
+					(. . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .)
+					(. . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .)
+					(. . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .)
+					(. . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .)
+					(. . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .)
+					(. . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .)
+					(. . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .)
+					(. . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .)
+					(. . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .)
+					(. . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .)
+					(. . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .)
+					(. . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .)
+					(. . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .)
+					(. . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .)
+					(. . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .)
+					(. . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .)
+					(. . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .)
+					(. . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .)
+					(. . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .)
+					(. . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .)
+					(. . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .)
+					(. . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .)
+					(. . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .)
+					(. . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .)
+					(. . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .)
+					(. . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .)
+					(. . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .)
+					(. . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .)
+					(. . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .)
+					(. . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .)
+					(. . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .)
+					(. . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .)
+					(. . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .)
+					(. . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .)
+					(. . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .)
+					(. . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .)
+					(. . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .)
+					(. . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .)
+					(. . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .)
+					(. . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .)
+					(. . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .)
+					(. . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .)
+					(. . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .)
+					(. . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .)
+					(. . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .)
+					(. 0 0 0 . . . . . . . . . . . 0 0 0 . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .)
+					(0 . . 0 . . . . . . . . . . 0 . . 0 . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .)
+					(. . . 0 . . . . 0 0 0 . . . . . . 0 . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .)
+					(. . . 0 . . . . 0 . . 0 . . . . . 0 . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .)
+					(. . 0 . . . . 0 . . . . . . . . 0 . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .)
+					(. . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .)
+					(. . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .)
+					(. . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .)
+					(. . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .)
+					(. . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .)
+					(. . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .)
+					(. . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .)
+					))
+				))
+			)
+	</Globals>
+</TranscendenceLibrary>

@@ -1,0 +1,703 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!DOCTYPE TranscendenceExtension
+[
+	
+	<!ENTITY unidEdgeGlobals				"0xED6E6000">
+	
+	<!--	CUSTOM	ENTITIES	-->
+	<!ENTITY unidNeurogueLibrary			"0xED6E0400">
+	<!ENTITY dsNeurogue						"0xED6E0401">
+]>
+<!--
+Now look at this NetHack that I just found. When I say fight, be ready to die. Fight!
+-->
+<TranscendenceLibrary UNID="&unidNeurogueLibrary;" name="Neurogue Library" apiVersion="35" version="1.0" credits="0xABCDEF (Game &amp; Forum) / Archcannon (IRC &amp; Xelerus)">
+
+	<Library UNID="&unidEdgeGlobals;"/>
+	
+	<DockScreen UNID="&dsNeurogue;"
+			name=				"Neurogue"
+			backgroundID=		"none"
+			>
+		<OnScreenInit>
+		</OnScreenInit>
+			
+		<Display>
+			<Canvas>
+				(netDraw)
+			</Canvas>
+		</Display>
+		<Panes>
+			<Default>
+				<OnPaneInit>
+					(scrSetDesc gScreen gMessage)
+				</OnPaneInit>
+				<Actions>
+					<Action id="actionPlayerAct"	minor="true">
+						(block Nil
+							(netClearMessage)
+							(netPlayerAct)
+							(scrShowPane gScreen "Default")
+							)
+					</Action>
+					<Action id="actionLeft"	minor="true">
+						(block Nil
+							(netClearMessage)
+							(netDefaultAction (netGetPlayer) (- (netGetPlayerX) 1) (netGetPlayerY))
+							(netUpdate)
+							(scrShowPane gScreen "Default")
+							)
+					</Action>
+					<Action id="actionRight"	minor="true">
+						(block Nil
+							(netClearMessage)
+							(netDefaultAction (netGetPlayer) (+ (netGetPlayerX) 1) (netGetPlayerY))
+							(netUpdate)
+							(scrShowPane gScreen "Default")
+							)
+					</Action>
+					<Action id="actionUp"	minor="true">
+						(block Nil
+							(netClearMessage)
+							(netDefaultAction (netGetPlayer) (netGetPlayerX) (- (netGetPlayerY) 1))
+							(netUpdate)
+							(scrShowPane gScreen "Default")
+							)
+					</Action>
+					<Action id="actionDown"	minor="true">
+						(block Nil
+							(netClearMessage)
+							(netAddMessage "You move down")
+							(netDefaultAction (netGetPlayer) (netGetPlayerX) (+ (netGetPlayerY) 1))
+							(netUpdate)
+							(scrShowPane gScreen "Default")
+							)
+					</Action>
+				</Actions>
+			</Default>
+		</Panes>
+		
+		<Language>
+			<Text id="actionPlayerAct">"[E] - Act"</Text>
+			<Text id="actionLeft">"[A] - Left"</Text>
+			<Text id="actionRight">"[D] - Right"</Text>
+			<Text id="actionUp">"[W] - Up"</Text>
+			<Text id="actionDown">"[S] - Down"</Text>
+		</Language>
+		<Events>
+			<OnGlobalUniverseCreated>
+				(sysAddTypeTimerEvent 1 &dsNeurogue; "ShowScreen")
+			</OnGlobalUniverseCreated>
+			<ShowScreen>
+				(block Nil
+					(netSetDefaults)
+					(netShowScreen)
+					)
+			</ShowScreen>
+		</Events>
+	</DockScreen>
+	<Globals>
+		(block Nil
+			(setq gMap Nil)
+			(setq gSovereigns Nil)
+			(setq gEntities Nil)
+			(setq gMessage "")
+			<!--
+			(enum '(gMap gSovereigns gEntities gMessage) theGlobal
+				(set theGlobal Nil)
+				)
+			-->
+			(setq netSetDefaults (lambda Nil
+				(block Nil
+					(setq gMap '(
+		(. . . . . . . . . . . . . . . . . . . . . . . . . + . . . . . . . . . . . . . . . . . . . . . . . . . )
+		(. . . . . . . . . . . . . . . . . . + + + + + + + + + + + + + + + . . . . . . . . . . . . . . . . . . )
+		(. . . . . . . . . . . . . . . . + + + + + + + + + + + + + + + + + + + . . . . . . . . . . . . . . . . )
+		(. . . . . . . . . . . . . . + + + + + + + + + + + + + + + + + + + + + + + . . . . . . . . . . . . . . )
+		(. . . . . . . . . . . . + + + + + + + + + + + + + + + + + + + + + + + + + + + . . . . . . . . . . . . )
+		(. . . . . . . . . . + + + + + + + + + + + + + + + + + + + + + + + + + + + + + + + . . . . . . . . . . )
+		(. . . . . . . . . + + + + + + + + + + + + + + + + + + + + + + + + + + + + + + + + + . . . . . . . . . )
+		(. . . . . . . . + + + + + + + + + + + + + + + + + + + + + + + + + + + + + + + + + + + . . . . . . . . )
+		(. . . . . . . + + + + + + + + + + + + + + + + + + + + + + + + + + + + + + + + + + + + + . . . . . . . )
+		(. . . . . . + + + + + + + + + + + + + + + + + + + + + + + + + + + + + + + + + + + + + + + . . . . . . )
+		(. . . . . + + + + + + + + + + + + + + + . . . . . . . . . . . + + + + + + + + + + + + + + + . . . . . )
+		(. . . . . + + + + + + + + + + + + + . . . . . . . . . . . . . . . + + + + + + + + + + + + + . . . . . )
+		(. . . . + + + + + + + + + + + + . . . . . . . . . . . . . . . . . . . + + + + + + + + + + + + . . . . )
+		(. . . . + + + + + + + + + + + . . . . . . . . . . . . . . . . . . . . . + + + + + + + + + + + . . . . )
+		(. . . + + + + + + + + + + + . . . . . . . . . . . . . . . . . . . . . . . + + + + + + + + + + + . . . )
+		(. . . + + + + + + + + + + . . . . . . . . . . . . . . . . . . . . . . . . . + + + + + + + + + + . . . )
+		(. . + + + + + + + + + + . . . . . . . . . . . . . . . . . . . . . . . . . . . + + + + + + + + + + . . )
+		(. . + + + + + + + + + + . . . . . . . . . . . . . . . . . . . . . . . . . . . + + + + + + + + + + . . )
+		(. + + + + + + + + + + . . . . . . . . . . . . . . . . . . . . . . . . . . . . . + + + + + + + + + + . )
+		(. + + + + + + + + + + . . . . . . . . . . . . . . . . . . . . . . . . . . . . . + + + + + + + + + + . )
+		(. + + + + + + + + + . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . + + + + + + + + + . )
+		(. + + + + + + + + + . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . + + + + + + + + + . )
+		(. + + + + + + + + + . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . + + + + + + + + + . )
+		(. + + + + + + + + + . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . + + + + + + + + + . )
+		(. + + + + + + + + + . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . + + + + + + + + + . )
+		(+ + + + + + + + + + . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . + + + + + + + + + + )
+		(. + + + + + + + + + . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . + + + + + + + + + . )
+		(. + + + + + + + + + . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . + + + + + + + + + . )
+		(. + + + + + + + + + . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . + + + + + + + + + . )
+		(. + + + + + + + + + . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . + + + + + + + + + . )
+		(. + + + + + + + + + . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . + + + + + + + + + . )
+		(. + + + + + + + + + + . . . . . . . . . . . . . . . . . . . . . . . . . . . . . + + + + + + + + + + . )
+		(. + + + + + + + + + + . . . . . . . . . . . . . . . . . . . . . . . . . . . . . + + + + + + + + + + . )
+		(. . + + + + + + + + + + . . . . . . . . . . . . . . . . . . . . . . . . . . . + + + + + + + + + + . . )
+		(. . + + + + + + + + + + . . . . . . . . . . . . . . . . . . . . . . . . . . . + + + + + + + + + + . . )
+		(. . . + + + + + + + + + + . . . . . . . . . . . . . . . . . . . . . . . . . + + + + + + + + + + . . . )
+		(. . . + + + + + + + + + + + . . . . . . . . . . . . . . . . . . . . . . . + + + + + + + + + + + . . . )
+		(. . . . + + + + + + + + + + + . . . . . . . . . . . . . . . . . . . . . + + + + + + + + + + + . . . . )
+		(. . . . + + + + + + + + + + + + . . . . . . . . . . . . . . . . . . . + + + + + + + + + + + + . . . . )
+		(. . . . . + + + + + + + + + + + + + . . . . . . . . . . . . . . . + + + + + + + + + + + + + . . . . . )
+		(. . . . . + + + + + + + + + + + + + + + . . . . . . . . . . . + + + + + + + + + + + + + + + . . . . . )
+		(. . . . . . + + + + + + + + + + + + + + + + + + + + + + + + + + + + + + + + + + + + + + + . . . . . . )
+		(. . . . . . . + + + + + + + + + + + + + + + + + + + + + + + + + + + + + + + + + + + + + . . . . . . . )
+		(. . . . . . . . + + + + + + + + + + + + + + + + + + + + + + + + + + + + + + + + + + + . . . . . . . . )
+		(. . . . . . . . . + + + + + + + + + + + + + + + + + + + + + + + + + + + + + + + + + . . . . . . . . . )
+		(. . . . . . . . . . + + + + + + + + + + + + + + + + + + + + + + + + + + + + + + + . . . . . . . . . . )
+		(. . . . . . . . . . . . + + + + + + + + + + + + + + + + + + + + + + + + + + + . . . . . . . . . . . . )
+		(. . . . . . . . . . . . . . + + + + + + + + + + + + + + + + + + + + + + + . . . . . . . . . . . . . . )
+		(. . . . . . . . . . . . . . . . + + + + + + + + + + + + + + + + + + + . . . . . . . . . . . . . . . . )
+		(. . . . . . . . . . . . . . . . . . + + + + + + + + + + + + + + + . . . . . . . . . . . . . . . . . . )
+		(. . . . . . . . . . . . . . . . . . . . . . . . . + . . . . . . . . . . . . . . . . . . . . . . . . . )
+						))
+					(setq gSovereigns (list
+						{
+							player:	{
+								friend: '(commonwealth)
+								enemy:	'(penitents)
+								}
+							commonwealth: {
+								friend: '(player)
+								enemy:	'(penitents)
+								}
+							penitents: {
+								enemy: '(player commonwealth)
+								}
+							}
+						))
+					(setq gEntities (list
+						{
+							name:			"Player"
+							char:			"@"
+							color:			'(255 255 255)
+							sovereign:		'player
+							maxHitPoints:	20
+							hitPoints:		20
+							attackDamage:	6
+							posX:			10
+							posY:			15
+							}
+						(netCreateEntityAtRandomLocation netCommonwealthOfficer)
+						(netCreateEntityAtRandomLocation netCommonwealthOfficer)
+						(netCreateEntityAtRandomLocation netCommonwealthOfficer)
+						(netCreateEntityAtRandomLocation netCommonwealthOfficer)
+						(netCreateEntityAtRandomLocation netPenitentAgent)
+						(netCreateEntityAtRandomLocation netPenitentAgent)
+						))
+					)
+				))
+			(setq netGetMapHeight (lambda Nil
+				(count gMap)
+				))
+			(setq netGetMapWidth (lambda (y)
+				(count (@ gMap y))
+				))
+			(setq netGetMapTile (lambda (position)
+				(block	(
+							(x (@ position 'x))
+							(y (@ position 'y))
+							)
+					(and (gr y -1) (ls y (netGetMapHeight)) (gr x -1) (ls x (netGetMapWidth y)) (@ (@ gMap y) x))
+					)
+				))
+			(setq netMapTileIsFloor (lambda (position)
+				(eq (netGetMapTile position) '+)
+				))
+			(setq netShowScreen (lambda Nil
+				(scrShowScreen gScreen &dsNeurogue;)
+				))
+			(setq netStandardBehavior (lambda (source)
+				(block	(
+							(name (@ source 'name))
+							(path (@ source 'path))
+							)
+					(printTo 'log (cat name " position: " (@ source 'posX) ", " (@ source 'posY)))
+					(switch
+						;Follow our current path
+						path
+							(block	(
+										(step (@ path 0))
+										(newX (@ step 'x))
+										(newY (@ step 'y))
+										
+										nextStep
+										)
+								(printTo 'log (cat name " following path"))
+								(printTo 'log (cat name " steps left: " (count path)))
+								;Make sure that this unit actually changes position by moving to the new position
+								(netDefaultAction source newX newY)
+								;Check if we moved to a new position
+								(if (and (eq (@ source 'posX) newX) (eq (@ source 'posY) newY))
+									;If so, remove this step from the path
+									(block Nil
+										(printTo 'log (cat name " moves"))
+										(lnkRemove path 0)
+										)
+									(block	(
+												(dest (@ path (- (count path) 1)))
+												(destX (@ dest 'x))
+												(destY (@ dest 'y))
+												)
+										;Otherwise, find another path
+										(printTo 'log (cat name " stands"))
+										(setq path Nil)
+										(loop (not path)
+											(setq path (netGenerateEffortPath {x:(@ source 'posX) y:(@ source 'posY)} {x:destX y:destY}))
+											)
+										(set@ source 'path path)
+										)
+									)
+								(printTo 'log (cat name " following path"))
+								
+								(setq nextStep (@ path 0))
+								(printTo 'log (cat name " will step to " (@ nextStep 'x) ", " (@ nextStep 'y)))
+								(printTo 'log (cat name " steps left: " (count path)))
+								)
+						;If we don't have a destination and a path, then we make one.
+						(block	(
+									(posX (@ source 'posX))
+									(posY (@ source 'posY))
+									)
+							(loop (not path)
+								(block	(
+											(dest (netGetRandomFloorTile))
+											(destX (@ dest 'x))
+											(destY (@ dest 'y))
+											)
+									(setq path (netGenerateEffortPath {x:posX y:posY} {x:destX y:destY}))
+									)
+								)
+							(printTo 'log (cat name " generating path"))
+							(set@ source 'path path)
+							)
+						)
+					)
+				))
+			(setq netGetRandomTile (lambda (char)
+				(block	(
+							(tiles Nil)
+							)
+					(printTo 'log (cat "Getting random tile " char))
+					(for y 0 (- (count gMap) 1)
+						(for x 0 (- (count (@ gMap y)) 1)
+							(if (eq (netGetMapTile {x:x y:y}) char)
+								(lnkAppend tiles {x:x y:y})
+								)
+							)
+						)
+					(random tiles)
+					)
+				))
+			(setq netGetRandomFloorTile (lambda Nil
+				(netGetRandomTile '+)
+				))
+			(setq netGetRandomOpenTile (lambda Nil
+				(block	(
+							(tiles Nil)
+							)
+					(printTo 'log "Getting random open tile")
+					(for y 0 (- (count gMap) 1)
+						(for x 0 (- (count (@ gMap y)) 1)
+							(if (and (netMapTileIsFloor {x:x y:y}) (not (netGetEntityAtPosition x y)))
+								(lnkAppend tiles {x:x y:y})
+								)
+							)
+						)
+					(random tiles)
+					)
+				))
+			(setq netCreateEntity (lambda (type posX posY)
+				(block ((entity (struct type)))
+					(printTo 'log (cat "Creating " (@ type 'name) " at (" posX ", " posY ")"))
+					(set@ entity 'posX posX)
+					(set@ entity 'posY posY)
+					)
+				))
+			(setq netCreateEntityAtRandomLocation (lambda (type)
+				(block	(
+							(pos (netGetRandomOpenTile))
+							(posX (@ pos 'x))
+							(posY (@ pos 'y))
+							)
+					(printTo 'log (cat "Creating " (@ type 'name) " at random location"))
+					(netCreateEntity type posX posY)
+					)
+				))
+			(setq netCommonwealthOfficer {
+				name:			"Commonwealth officer"
+				char:			'C
+				color:			'(255 255 255)
+				sovereign:		'commonwealth
+				maxHitPoints:	20
+				hitPoints:		20
+				attackDamage:	6
+				behavior:		netStandardBehavior
+				})
+			(setq netPenitentAgent {
+				name:			"Penitent agent"
+				char:			"P"
+				color:			'(149 114 110)
+				sovereign:		'penitents
+				maxHitPoints:	20
+				hitPoints:		20
+				attackDamage:	10
+				behavior:		netStandardBehavior
+				})
+			;The default action that an entity will carry out at a location.
+			(setq netDefaultAction (lambda (entity x y)
+				(block	(
+							(other (netGetEntityAtPosition x y))
+							)
+					(printTo 'log (cat (@ entity 'name) " acted at location " x ", " y))
+					(switch
+						;If we are blocked and the other entity is an enemy, then attack
+						other
+							(if (netEntityIsEnemy entity other)
+								(netAttackEntity entity theEntity)
+								Nil
+								)
+						(netMapTileIsFloor {x:x y:y})
+							(netSetPosition entity x y)
+						)
+					)
+				))
+			(setq netGetDirectionOffset (lambda (x y direction)
+				(switch
+					(eq direction 'left)
+						{
+							x: (- x 1)
+							y: y
+							}
+					(eq direction 'right)
+						{
+							x: (+ x 1)
+							y: y
+							}
+					(eq direction 'up)
+						{
+							x: x
+							y: (- y 1)
+							}
+					(eq direction 'down)
+						{
+							x: x
+							y: (+ y 1)
+							}
+					)
+				))
+			(setq netGetEntityAtPosition (lambda (x y)
+				(block Nil
+					;(printTo 'log "(netGetEntityAtPosition " x " " y ")")
+					(match gEntities theEntity (and (eq (@ theEntity 'posX) x) (eq (@ theEntity 'posY) y)))
+					)
+				))
+			(setq netGetEntityInDirection (lambda (x y direction)
+				(block ((pos (netGetDirectionOffset x y direction)))
+					(printTo 'log (cat "(netGetEntityInDirection " x " " y " " direction ")"))
+					(printTo 'log (cat "Getting entity in direction " direction  " from (" x ", " y ")"))
+					(netGetEntityAtPosition (@ pos 'x) (@ pos 'y))
+					)
+				))
+			(setq netSetPosition (lambda (entity posX posY)
+				(block Nil
+					(print (cat "Setting position of " (@ entity 'name) " to (" posX ", " posY ")"))
+					(set@ entity 'posX posX)
+					(set@ entity 'posY posY)
+					)
+				))
+			(setq netUpdate (lambda Nil
+				(block Nil
+					(setq gMessage "")
+					(enum gEntities theEntity
+						(block	(
+									(behavior (@ theEntity 'behavior))
+									)
+							(printTo 'log (cat "Updating " (@ theEntity 'name)))
+							(if behavior
+								(behavior theEntity)
+								)
+							)
+						)
+					)
+				))
+			(setq netClearMessage (lambda Nil
+				(setq gMessage "")
+				))
+			(setq netAddMessage (lambda (message)
+				(setq gMessage (cat gMessage "\n"))
+				))
+			(setq netPlayerAct (lambda Nil
+				(netAddMessage "You do nothing")
+				))
+			(setq netDraw (lambda Nil
+				(block	(
+							)
+					(cnvDrawRect 0 0 600 500 '(0 0 0))
+					(for y 0 (- (count gMap) 1)
+						(for x 0 (- (count (@ gMap y)) 1)
+							(netDrawTile x y (netGetMapTile {x:x y:y}) '(255 255 255))
+							)
+						)
+					(enum gEntities theEntity
+						(netDrawTile (@ theEntity 'posX) (@ theEntity 'posY) (@ theEntity 'char) (@ theEntity 'color))
+						)
+					)
+				))
+			(setq netDrawTile (lambda (x y char color)
+				(block	(
+							(size 14)
+							(halfSize (/ size 2))
+							(textX (* x size))
+							(textY (* y size))
+							(tileX (- textX halfSize))
+							(tileY textY)
+							)
+					;(prnEventStart "Drawing Tile")
+					;Draw a black background so that characters do not overlap. Shift it to the left 
+					(cnvDrawRect tileX tileY size size '(0 0 0))
+					(cnvDrawText textX textY size char 'mediumBold color 'center)
+					;(prnEventEnd "Drawing Tile")
+					)
+				))
+			<!--
+			(setq netCalculatePath (lambda (x1 y1 x2 y2)
+				(block ((allPaths Nil))
+					(printTo 'log (cat "Calculating path from (" x1 ", " y1 ") to (" x2 ", " y2 ")"))
+					(netCalculateStep x1 y1 x2 y2 Nil allPaths)
+					(@ (sortByLambda allPaths (lambda (thePath) (count thePath)) 'ascending) 0)
+					)
+				))
+			(setq netCalculateStep (lambda (x1 y1 x2 y2 currentPath allPaths)
+				(switch
+					(not (printTo 'log (cat "Calculating step from (" x1 ", " y1 ") to (" x2 ", " y2 ")")))
+						Nil
+					;Check if we can step on here
+					(and (not (netMapTileIsFloor x1 y1)) (printTo 'log "Not a floor"))
+						Nil
+					;Check if we already stepped on here
+					(and (find currentPath (list x1 y1)) (printTo 'log "Already stepped here"))
+						Nil
+					;Check if we reached the destination
+					(and (eq (list x1 y1) (list x2 y2)) (printTo 'log "Found destination"))
+						(lnkAppend allPaths currentPath) ;Add completed path
+					(block	(
+								;Create a new pointer
+								(newCurrentPath (append currentPath (list (list x1 y1))))
+								)
+						(printTo 'log "Step left")	(netCalculateStep (- x1 1) y1 x2 y2 newCurrentPath allPaths)
+						(printTo 'log "Step right")	(netCalculateStep (+ x1 1) y1 x2 y2 newCurrentPath allPaths)
+						(printTo 'log "Step up")	(netCalculateStep x1 (- y1 1) x2 y2 newCurrentPath allPaths)
+						(printTo 'log "Step down")	(netCalculateStep x1 (+ y1 1) x2 y2 newCurrentPath allPaths)
+						)
+					)
+				))
+			-->
+			;Generates an effort map for all spaces based on distance from the start. Breadth-first because depth-first is wasteful
+			(setq netGenerateEffortMap (lambda (start)
+				(block	(
+							;append, struct, xmlCreate all create new pointers
+							(effortMap (append gMap))
+							(tiles (list start))
+							(distance 0)
+							)
+					(for y 0 (- (count effortMap) 1)
+						(block	(
+									;Need to create new pointers for each row
+									(row (append (@ gMap y)))
+									)
+							(set@ effortMap y row)
+							(for x 0 (- (count row) 1)
+								(set@ row x Nil)
+								)
+							)
+						)
+					(loop tiles
+						(block	(
+									nextTiles
+									)
+							(enum tiles theTile
+								(block	(
+											(xPos (@ theTile 'x))
+											(yPos (@ theTile 'y))
+											(effortRow (@ effortMap yPos))
+											)
+									(if (and (netMapTileIsFloor theTile) (not (@ effortRow xPos)))
+										(block Nil
+											(set@ effortRow xPos distance)
+											(setq nextTiles (append nextTiles (list
+												{x:xPos y:(+ yPos 1)}
+												{x:xPos y:(- yPos 1)}
+												{x:(+ xPos 1) y:yPos}
+												{x:(- xPos 1) y:yPos}
+												)))
+											)
+										)
+									)
+								)
+							(setq tiles nextTiles)
+							(setq distance (+ distance 1))
+							)
+						)
+					effortMap
+					)
+				))
+			<!--
+			;This version does not properly navigate around obstacles
+			(setq netGenerateEffortStep (lambda (start pos effortMap)
+				(block	(
+							(xStart (@ start 'x))
+							(yStart (@ start 'y))
+							(xPos (@ pos 'x))
+							(yPos (@ pos 'y))
+							(xDiff (abs (- xStart xPos)))
+							(yDiff (abs (- yStart yPos)))
+							)
+					(if (and (netMapTileIsFloor pos) (not (@ (@ effortMap yPos) xPos)))
+						(block Nil
+							(set@ (@ effortMap yPos) xPos (+ xDiff yDiff))
+							(netGenerateEffortStep start {x:xPos y:(+ yPos 1)} effortMap)
+							(netGenerateEffortStep start {x:xPos y:(- yPos 1)} effortMap)
+							(netGenerateEffortStep start {x:(+ xPos 1) y:yPos} effortMap)
+							(netGenerateEffortStep start {x:(- xPos 1) y:yPos} effortMap)
+							)
+						;If this is not a tile, then do not step anywhere else from here
+						)
+					)
+				))
+			-->
+			(setq netGetDistance (lambda (pos dest)
+				(+ (abs (- (@ pos 'x) (@ dest 'x))) (abs (- (@ pos 'y) (@ dest 'y))))
+				))
+			(setq netGenerateEffortPath (lambda (start dest)
+				(block	(
+							(effortMap (netGenerateEffortMap dest))
+							path
+							(pos (struct start))
+							)
+					;Look in all four directions and step towards the spot with the lowest effort. Make sure that we are not at the destination yet and that the tile we are on has an effort value on it.
+					(loop (and (neq pos dest) (@ (@ effortMap (@ pos 'y)) (@ pos 'x)))
+						(block	(
+									(xPos (@ pos 'x))
+									(yPos (@ pos 'y))
+									(next
+										(@
+											;Sort by effort
+											(sortByLambda
+												(list
+													{x:xPos y:(+ yPos 1)}
+													{x:xPos y:(- yPos 1)}
+													{x:(+ xPos 1) y:yPos}
+													{x:(- xPos 1) y:yPos}
+													)
+												;If there is an effort value on this tile, then return the value. Otherwise, return 1000000
+												(lambda (thePos)
+													(or
+														(@ (@ effortMap (@ thePos 'y)) (@ thePos 'x))
+														1000000
+														)
+													)
+												'ascending
+												)
+											0
+											)
+										)
+									)
+							(setq pos next)
+							(lnkAppend path next)
+							(printTo 'log (cat "Path Step " (@ next 'x) ", " (@ next 'y)))
+							)
+						)
+					(if (eq pos dest)
+						path
+						Nil
+						)
+					)
+				))
+			(setq netGetVisibleEntities (lambda (x y)
+				(filter gEntities theEntity
+					(netHasLineOfSight {x:x y:y} {x:(@ theEntity 'x) y:(@ theEntity 'y)})
+					)
+				))
+			(setq netHasLineOfSight (lambda (pos dest)
+				(block	(
+							(x1 (@ pos 'x))
+							(y1 (@ pos 'y))
+							(x2 (@ dest 'x))
+							(y2 (@ dest 'y))
+							(slope (/ (- y2 y1) (- x2 x1)))
+							active
+							result
+							)
+					(prnEventStart "Checking Line of Sight")
+					;Trace a line from the origin using slope until we either reach the destination or the boundary
+					(loop (and (netMapTileIsFloor { x:x1 y:y1 }) active (not result))
+						(block Nil
+							(setq x1 (+ x1 1))
+							;Check all squares between the current square and the next square in case the absolute slope is greater than 1
+							(if (gr slope 0)
+								(for i 0 slope
+									(switch
+										(eq {x:x1 y:(int (+ y1 i))} dest)
+											(setq result True)
+										;If this is not a floor, then we cannot see past it
+										(not (netMapTileIsFloor {x:x1 y:(int (+ y1 i))}))
+											(setq active Nil)
+										)
+									)
+								(for i slope 0
+									(switch
+										(eq {x:x1 y:(int (- y1 i))} dest)
+											(setq result True)
+										;If this is not a floor, then we cannot see past it
+										(not (netMapTileIsFloor {x:x1 y:(int (- y1 i))}))
+											(setq active Nil)
+										)
+									)
+								)
+							(setq y1 (+ y1 slope))
+							)
+						)
+					(prnEventEnd "Checking Line of Sight")
+					result
+					)
+				))
+			(setq netGetPlayer (lambda Nil
+				(match gEntities theEntity (eq (@ theEntity 'name) 'player))
+				))
+			(setq netGetPlayerX (lambda Nil
+				(@ (netGetPlayer) 'posX)
+				))
+			(setq netGetPlayerY (lambda Nil
+				(@ (netGetPlayer) 'posY)
+				))
+			(setq netEntityIsEnemy (lambda (source target)
+				(find (@ gSovereigns (@ source 'sovereign)) target 'enemy)
+				))
+			(setq netAttackEntity (lambda (attacker target)
+				(block Nil
+					(set@ target 'hitPoints (- (@ target 'hitPoints) (@ attacker 'attackDamage)))
+					(if (ls (@ target 'hitPoints) 1)
+						(netRemoveEntity target)
+						)
+					)
+				))
+			(setq netRemoveEntity (lambda (target)
+				(block ((index (find gEntities target)))
+					(if index (lnkRemove gEntities target))
+					)
+				))
+			)
+	</Globals>
+</TranscendenceLibrary>

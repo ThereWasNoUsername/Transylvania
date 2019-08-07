@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!DOCTYPE TranscendenceExtension
+[
+	
+	<!ENTITY unidLifehackLibrary		"0xED6E0410">
+	
+	<!--	CUSTOM	ENTITIES	-->
+	<!ENTITY unidExtension					"0xED6E0415">
+]>
+<TranscendenceExtension UNID="&unidExtension;" name="Lifehack Demo 0" apiVersion="35" version="1.0" credits="0xABCDEF (Game &amp; Forum) / Archcannon (IRC &amp; Xelerus)">
+	<Library UNID="&unidLifehackLibrary;"/>
+</TranscendenceExtension>
