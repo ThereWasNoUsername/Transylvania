@@ -8,3 +8,4 @@ Here, you will find the official source code releases for the following Transcen
 - [Starship Figurines](http://multiverse.kronosaur.com/transEntry.hexm?unid=Transcendence%3Aa0130020)
 - [Typehack](http://multiverse.kronosaur.com/transEntry.hexm?unid=Transcendence%3Aa0130030)
 - Penitent Space Library (pending)
+- 3D models (pending)
